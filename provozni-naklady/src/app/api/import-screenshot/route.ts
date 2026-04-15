@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-opus-4-5',
         max_tokens: 2048,
         messages: [
           {
@@ -46,23 +46,24 @@ Pokud nejsou položky, vrať: []`,
       }),
     })
 
+    const rawText = await response.text()
+    console.log('Anthropic status:', response.status)
+    console.log('Anthropic raw response:', rawText)
+
     if (!response.ok) {
-      const err = await response.text()
-      console.error('Anthropic API error:', err)
-      return NextResponse.json({ items: [], error: err }, { status: 500 })
+      return NextResponse.json({ items: [], error: rawText }, { status: 500 })
     }
 
-    const data = await response.json()
+    const data = JSON.parse(rawText)
     const text = data.content?.[0]?.text || '[]'
-    console.log('Claude response:', text)
+    console.log('Claude text output:', text)
 
     let items = []
     try {
       const clean = text.replace(/```json|```/g, '').trim()
       items = JSON.parse(clean)
     } catch (e) {
-      console.error('JSON parse error:', e, 'Raw:', text)
-      items = []
+      console.error('JSON parse error:', e, 'Raw text:', text)
     }
 
     return NextResponse.json({ items })
