@@ -120,9 +120,9 @@ export default function Home() {
             { key: 'rozdil', label: 'Rozdíl v částce', count: countRozdil, dot: 'var(--amber)' },
           ].map(({ key, label, count, dot }) => (
             <button key={key} onClick={() => setFilter(key as typeof filter)} style={{
-              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              width: 'calc(100% - 8px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '6px 12px', background: filter === key ? 'var(--bg)' : 'transparent',
-              border: 'none', borderRadius: 6, margin: '1px 4px', width: 'calc(100% - 8px)',
+              border: 'none', borderRadius: 6, margin: '1px 4px',
               cursor: 'pointer', color: filter === key ? 'var(--text-primary)' : 'var(--text-secondary)',
               fontWeight: filter === key ? 500 : 400
             }}>
