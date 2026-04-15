@@ -154,19 +154,6 @@ export default function Home() {
           ))}
         </div>
 
-        <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ padding: '0 12px 6px', fontSize: 11, fontWeight: 500, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Pravidelnost</div>
-          {(['vše', ...PRAVIDELNOST] as const).map((p) => {
-            const count = p === 'vše' ? rows.length : rows.filter(r => r.pravidelnost === p).length
-            return (
-              <div key={p} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 12px' }}>
-                <span style={{ fontSize: 13, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{p}</span>
-                <span style={{ fontSize: 12, color: 'var(--text-tertiary)', background: 'var(--bg)', padding: '1px 6px', borderRadius: 4 }}>{count}</span>
-              </div>
-            )
-          })}
-        </div>
-
         <div style={{ padding: '12px 0', flex: 1, overflowY: 'auto' }}>
           <div style={{ padding: '0 12px 6px', fontSize: 11, fontWeight: 500, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Měsíc</div>
           {MONTHS.map((m, i) => (
@@ -220,21 +207,19 @@ export default function Home() {
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-tertiary)' }}>Načítám…</div>
           ) : (
-            <div style={{ background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden', minWidth: 1000 }}>
+            <div style={{ background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden', minWidth: 800 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)' }}>
                     {[
-                      { label: 'Název', w: '17%', align: 'left' },
-                      { label: 'Pravidelnost', w: '10%', align: 'left' },
-                      { label: 'Bez DPH', w: '9%', align: 'right' },
-                      { label: 'DPH %', w: '6%', align: 'center' },
-                      { label: 'S DPH', w: '9%', align: 'right' },
-                      { label: 'CL bez DPH', w: '9%', align: 'right' },
-                      { label: 'CL s DPH', w: '9%', align: 'right' },
-                      { label: 'Rozdíl', w: '9%', align: 'right' },
-                      { label: 'Stav', w: '9%', align: 'left' },
-                      { label: 'Poznámka', w: '13%', align: 'left' },
+                      { label: 'Název', w: '22%', align: 'left' },
+                      { label: 'Cena bez DPH', w: '12%', align: 'right' },
+                      { label: 'DPH %', w: '7%', align: 'center' },
+                      { label: 'Cena s DPH', w: '12%', align: 'right' },
+                      { label: 'CL', w: '12%', align: 'right' },
+                      { label: 'Rozdíl', w: '10%', align: 'right' },
+                      { label: 'Stav', w: '10%', align: 'left' },
+                      { label: 'Poznámka', w: '15%', align: 'left' },
                     ].map((col, i) => (
                       <th key={i} style={{
                         padding: '10px 10px', textAlign: col.align as 'left' | 'right' | 'center',
@@ -248,7 +233,6 @@ export default function Home() {
                 </thead>
                 <tbody>
                   {filtered.map((row, idx) => {
-                    const diffEx = row.ucet_bez_dph - row.cl_bez_dph
                     const diffVat = row.ucet_s_dph - row.cl_s_dph
                     return (
                       <tr key={row.id} style={{
@@ -265,21 +249,7 @@ export default function Home() {
                             onCommit={commitEdit}
                           />
                         </td>
-                        {/* Pravidelnost */}
-                        <td style={{ padding: '9px 10px' }}>
-                          <select
-                            value={row.pravidelnost || 'měsíčně'}
-                            onChange={e => updateField(row.id, 'pravidelnost', e.target.value)}
-                            style={{
-                              border: 'none', background: 'transparent', fontSize: 12,
-                              fontFamily: 'var(--font)', cursor: 'pointer', outline: 'none',
-                              color: 'var(--text-secondary)', width: '100%'
-                            }}
-                          >
-                            {PRAVIDELNOST.map(p => <option key={p} value={p}>{p}</option>)}
-                          </select>
-                        </td>
-                        {/* Bez DPH (účet) */}
+                        {/* Cena bez DPH */}
                         <NumCell row={row} field="ucet_bez_dph" editingCell={editingCell} editValue={editValue} setEditValue={setEditValue} startEdit={startEdit} commitEdit={commitEdit} />
                         {/* DPH % */}
                         <td style={{ padding: '9px 10px', textAlign: 'center' }}>
@@ -296,21 +266,15 @@ export default function Home() {
                             {DPH_SAZBY.map(s => <option key={s} value={s}>{s} %</option>)}
                           </select>
                         </td>
-                        {/* S DPH (účet) — computed */}
+                        {/* Cena s DPH — computed */}
                         <td style={{ padding: '9px 10px', textAlign: 'right' }}>
                           <span style={{ fontSize: 13, fontWeight: 500, color: row.ucet_s_dph === 0 ? 'var(--text-tertiary)' : 'var(--text-primary)' }}>
                             {row.ucet_s_dph === 0 ? '—' : fmt(row.ucet_s_dph)}
                           </span>
                         </td>
-                        {/* CL bez DPH */}
-                        <NumCell row={row} field="cl_bez_dph" editingCell={editingCell} editValue={editValue} setEditValue={setEditValue} startEdit={startEdit} commitEdit={commitEdit} muted />
-                        {/* CL s DPH — computed */}
-                        <td style={{ padding: '9px 10px', textAlign: 'right' }}>
-                          <span style={{ fontSize: 13, color: row.cl_s_dph === 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)' }}>
-                            {row.cl_s_dph === 0 ? '—' : fmt(row.cl_s_dph)}
-                          </span>
-                        </td>
-                        {/* Rozdíl s DPH */}
+                        {/* CL (s DPH) */}
+                        <NumCell row={row} field="cl_s_dph" editingCell={editingCell} editValue={editValue} setEditValue={setEditValue} startEdit={startEdit} commitEdit={commitEdit} muted />
+                        {/* Rozdíl */}
                         <td style={{ padding: '9px 10px', textAlign: 'right' }}><DiffBadge value={diffVat} /></td>
                         {/* Stav */}
                         <td style={{ padding: '9px 10px' }}>
