@@ -14,6 +14,7 @@ export type Naklad = {
   cl_bez_dph: number
   ucet_s_dph: number
   cl_s_dph: number
+  dph_sazba: number
   stav: 'ok' | 'chybi' | 'rozdil'
   poznamka: string
   poradi: number
