@@ -12,8 +12,8 @@ export async function POST(req: NextRequest) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-5',
-        max_tokens: 1024,
+        model: 'claude-sonnet-4-5-20251001',
+        max_tokens: 2048,
         messages: [
           {
             role: 'user',
@@ -28,17 +28,25 @@ export async function POST(req: NextRequest) {
               },
               {
                 type: 'text',
-                text: `Jsi asistent pro zpracování účetních dat. Prohlédni tento screenshot a extrahuj z něj všechny položky provozních nákladů.
+                text: `Jsi asistent pro zpracování účetních dat z aplikace Costlocker nebo z výpisu z účtu.
 
-Pro každou položku vrať:
-- nazev: název položky/služby
-- cl_bez_dph: částka bez DPH v Kč (číslo, bez mezer a symbolů)
-- cl_s_dph: částka s DPH v Kč (číslo, pokud není uvedena, vypočítej jako cl_bez_dph * 1.21)
+Prohlédni screenshot a extrahuj VŠECHNY jednotlivé řádky s náklady — každý řádek kde je název položky a částka.
 
-Odpověz POUZE validním JSON polem, bez žádného jiného textu, vysvětlení ani markdown formátování. Příklad formátu:
-[{"nazev":"Nájem","cl_bez_dph":25000,"cl_s_dph":30250},{"nazev":"Internet","cl_bez_dph":890,"cl_s_dph":1077.9}]
+IGNORUJ:
+- Souhrnné/nadpisové řádky jako "Firemní náklady", "Celkové náklady", "Celkem" apod.
+- Řádky bez částky
 
-Pokud na screenshotu nejsou žádné náklady nebo ho nedokážeš přečíst, vrať prázdné pole: []`,
+PRO KAŽDOU POLOŽKU vrať:
+- nazev: přesný název jak je na screenshotu
+- cl_bez_dph: částka jako číslo (odstraň "Kč", mezery jako oddělovače tisíců, nahraď čárku tečkou). Pokud vidíš jen jednu částku na řádku, použij ji.
+- cl_s_dph: stejná hodnota jako cl_bez_dph (pokud DPH není explicitně odděleno)
+
+FORMÁT ČÍSEL v češtině: "310 000,00 Kč" = 310000, "19 100,00 Kč" = 19100, "9 400,00 Kč" = 9400
+
+Odpověz POUZE validním JSON polem, žádný jiný text ani markdown:
+[{"nazev":"Pronájem kanceláře","cl_bez_dph":100000,"cl_s_dph":100000},{"nazev":"Asana","cl_bez_dph":19100,"cl_s_dph":19100}]
+
+Pokud nejsou žádné položky, vrať: []`,
               },
             ],
           },
