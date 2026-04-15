@@ -5,6 +5,7 @@ import { supabase, type Naklad } from '@/lib/supabase'
 const MONTHS = ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec']
 const CURRENT_YEAR = new Date().getFullYear()
 const DPH_SAZBY = [0, 10, 12, 21]
+const PRAVIDELNOST = ['měsíčně', 'kvartálně', 'pololetně', 'ročně', 'jednorázově']
 
 function fmt(v: number) {
   return v.toLocaleString('cs-CZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' Kč'
@@ -30,10 +31,6 @@ export default function Home() {
   const [addingRow, setAddingRow] = useState(false)
   const [newRowName, setNewRowName] = useState('')
   const [filter, setFilter] = useState<'vse' | 'ok' | 'chybi' | 'rozdil'>('vse')
-  const [importing, setImporting] = useState(false)
-  const [importPreview, setImportPreview] = useState<{nazev: string; cl_bez_dph: number; dph_sazba: number}[] | null>(null)
-  const [importLoading, setImportLoading] = useState(false)
-  const [importSource, setImportSource] = useState<'cl' | 'ucet'>('cl')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -54,7 +51,6 @@ export default function Home() {
     const numericFields = ['ucet_bez_dph', 'cl_bez_dph', 'dph_sazba']
     const val = numericFields.includes(field as string) ? parseFloat(value as string) || 0 : value
 
-    // Recalculate s_dph fields when bez_dph or dph_sazba changes
     const currentRow = rows.find(r => r.id === id)!
     let updates: Partial<Naklad> = { [field]: val }
 
@@ -81,7 +77,7 @@ export default function Home() {
       mesic, rok, nazev: newRowName.trim(),
       ucet_bez_dph: 0, cl_bez_dph: 0,
       ucet_s_dph: 0, cl_s_dph: 0,
-      dph_sazba: 21,
+      dph_sazba: 21, pravidelnost: 'měsíčně',
       stav: 'ok', poznamka: '', poradi: maxPoradi
     }).select().single()
     if (data) setRows(prev => [...prev, data])
@@ -103,54 +99,6 @@ export default function Home() {
     if (!editingCell) return
     updateField(editingCell.id, editingCell.field, editValue)
     setEditingCell(null)
-  }
-
-  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setImportLoading(true)
-    setImporting(true)
-    setImportPreview(null)
-    const reader = new FileReader()
-    reader.onload = async (ev) => {
-      const dataUrl = ev.target?.result as string
-      const [meta, imageBase64] = dataUrl.split(',')
-      const mediaType = meta.match(/:(.*?);/)?.[1] || 'image/png'
-      try {
-        const res = await fetch('/api/import-screenshot', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64, mediaType }),
-        })
-        const { items } = await res.json()
-        setImportPreview(items)
-      } catch {
-        setImportPreview([])
-      }
-      setImportLoading(false)
-    }
-    reader.readAsDataURL(file)
-    e.target.value = ''
-  }
-
-  async function confirmImport(selected: typeof importPreview) {
-    if (!selected?.length) return
-    const maxPoradi = rows.length ? Math.max(...rows.map(r => r.poradi)) : 0
-    const toInsert = selected.map((item, i) => {
-      const sDph = calcSDph(item.cl_bez_dph, item.dph_sazba)
-      return {
-        mesic, rok, nazev: item.nazev, dph_sazba: item.dph_sazba,
-        ucet_bez_dph: importSource === 'ucet' ? item.cl_bez_dph : 0,
-        cl_bez_dph: importSource === 'cl' ? item.cl_bez_dph : 0,
-        ucet_s_dph: importSource === 'ucet' ? sDph : 0,
-        cl_s_dph: importSource === 'cl' ? sDph : 0,
-        stav: 'ok' as const, poznamka: '', poradi: maxPoradi + i + 1,
-      }
-    })
-    const { data } = await supabase.from('naklady').insert(toInsert).select()
-    if (data) setRows(prev => [...prev, ...data])
-    setImportPreview(null)
-    setImporting(false)
   }
 
   const filtered = filter === 'vse' ? rows : rows.filter(r => r.stav === filter)
@@ -183,12 +131,12 @@ export default function Home() {
 
         <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
           <div style={{ padding: '0 12px 6px', fontSize: 11, fontWeight: 500, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Stav</div>
-          {[
+          {([
             { key: 'vse', label: 'Vše', count: rows.length, dot: null },
             { key: 'ok', label: 'Souhlasí', count: countOk, dot: 'var(--green)' },
             { key: 'chybi', label: 'V CL chybí', count: countChybi, dot: 'var(--red)' },
             { key: 'rozdil', label: 'Rozdíl v částce', count: countRozdil, dot: 'var(--amber)' },
-          ].map(({ key, label, count, dot }) => (
+          ] as const).map(({ key, label, count, dot }) => (
             <button key={key} onClick={() => setFilter(key as typeof filter)} style={{
               width: 'calc(100% - 8px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '6px 12px', background: filter === key ? 'var(--bg)' : 'transparent',
@@ -204,6 +152,19 @@ export default function Home() {
               <span style={{ fontSize: 12, color: 'var(--text-tertiary)', background: 'var(--bg)', padding: '1px 6px', borderRadius: 4 }}>{count}</span>
             </button>
           ))}
+        </div>
+
+        <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ padding: '0 12px 6px', fontSize: 11, fontWeight: 500, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Pravidelnost</div>
+          {(['vše', ...PRAVIDELNOST] as const).map((p) => {
+            const count = p === 'vše' ? rows.length : rows.filter(r => r.pravidelnost === p).length
+            return (
+              <div key={p} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 12px' }}>
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{p}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-tertiary)', background: 'var(--bg)', padding: '1px 6px', borderRadius: 4 }}>{count}</span>
+              </div>
+            )
+          })}
         </div>
 
         <div style={{ padding: '12px 0', flex: 1, overflowY: 'auto' }}>
@@ -233,31 +194,16 @@ export default function Home() {
               </h1>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Porovnání plateb z účtu s položkami v Costlockeru</p>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
-                background: 'var(--surface)', color: 'var(--text-primary)',
-                border: '1px solid var(--border-strong)', borderRadius: 8,
-                fontWeight: 500, fontSize: 13, cursor: 'pointer'
-              }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
-                  <polyline points="21 15 16 10 5 21"/>
-                </svg>
-                Importovat screenshot
-                <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-              </label>
-              <button onClick={() => setAddingRow(true)} style={{
-                display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
-                background: 'var(--accent)', color: 'var(--accent-text)', border: 'none',
-                borderRadius: 8, fontWeight: 500, fontSize: 13
-              }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-                Přidat položku
-              </button>
-            </div>
+            <button onClick={() => setAddingRow(true)} style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
+              background: 'var(--accent)', color: 'var(--accent-text)', border: 'none',
+              borderRadius: 8, fontWeight: 500, fontSize: 13
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Přidat položku
+            </button>
           </div>
 
           {/* Summary cards */}
@@ -274,21 +220,21 @@ export default function Home() {
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-tertiary)' }}>Načítám…</div>
           ) : (
-            <div style={{ background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden', minWidth: 900 }}>
+            <div style={{ background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden', minWidth: 1000 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)' }}>
                     {[
-                      { label: 'Název', w: '18%', align: 'left' },
+                      { label: 'Název', w: '17%', align: 'left' },
+                      { label: 'Pravidelnost', w: '10%', align: 'left' },
+                      { label: 'Bez DPH', w: '9%', align: 'right' },
                       { label: 'DPH %', w: '6%', align: 'center' },
-                      { label: 'Účet bez DPH', w: '10%', align: 'right' },
-                      { label: 'Účet s DPH', w: '10%', align: 'right' },
-                      { label: 'CL bez DPH', w: '10%', align: 'right' },
-                      { label: 'CL s DPH', w: '10%', align: 'right' },
-                      { label: 'Rozdíl bez DPH', w: '9%', align: 'right' },
-                      { label: 'Rozdíl s DPH', w: '9%', align: 'right' },
+                      { label: 'S DPH', w: '9%', align: 'right' },
+                      { label: 'CL bez DPH', w: '9%', align: 'right' },
+                      { label: 'CL s DPH', w: '9%', align: 'right' },
+                      { label: 'Rozdíl', w: '9%', align: 'right' },
                       { label: 'Stav', w: '9%', align: 'left' },
-                      { label: 'Poznámka', w: '9%', align: 'left' },
+                      { label: 'Poznámka', w: '13%', align: 'left' },
                     ].map((col, i) => (
                       <th key={i} style={{
                         padding: '10px 10px', textAlign: col.align as 'left' | 'right' | 'center',
@@ -309,16 +255,33 @@ export default function Home() {
                         borderBottom: idx < filtered.length - 1 ? '1px solid var(--border)' : 'none',
                         background: saving === row.id ? '#fafaf8' : undefined
                       }}>
+                        {/* Název */}
                         <td style={{ padding: '9px 10px' }}>
                           <EditCell
                             isEditing={editingCell?.id === row.id && editingCell.field === 'nazev'}
                             value={editValue} display={row.nazev || '—'}
                             onChange={setEditValue}
                             onStart={() => startEdit(row.id, 'nazev', row.nazev)}
-                            onCommit={commitEdit} isText
+                            onCommit={commitEdit}
                           />
                         </td>
-                        {/* DPH sazba dropdown */}
+                        {/* Pravidelnost */}
+                        <td style={{ padding: '9px 10px' }}>
+                          <select
+                            value={row.pravidelnost || 'měsíčně'}
+                            onChange={e => updateField(row.id, 'pravidelnost', e.target.value)}
+                            style={{
+                              border: 'none', background: 'transparent', fontSize: 12,
+                              fontFamily: 'var(--font)', cursor: 'pointer', outline: 'none',
+                              color: 'var(--text-secondary)', width: '100%'
+                            }}
+                          >
+                            {PRAVIDELNOST.map(p => <option key={p} value={p}>{p}</option>)}
+                          </select>
+                        </td>
+                        {/* Bez DPH (účet) */}
+                        <NumCell row={row} field="ucet_bez_dph" editingCell={editingCell} editValue={editValue} setEditValue={setEditValue} startEdit={startEdit} commitEdit={commitEdit} />
+                        {/* DPH % */}
                         <td style={{ padding: '9px 10px', textAlign: 'center' }}>
                           <select
                             value={row.dph_sazba ?? 21}
@@ -330,27 +293,26 @@ export default function Home() {
                               color: 'var(--text-primary)', fontWeight: 500, width: '100%', textAlign: 'center'
                             }}
                           >
-                            {DPH_SAZBY.map(s => (
-                              <option key={s} value={s}>{s} %</option>
-                            ))}
+                            {DPH_SAZBY.map(s => <option key={s} value={s}>{s} %</option>)}
                           </select>
                         </td>
-                        <NumCell row={row} field="ucet_bez_dph" editingCell={editingCell} editValue={editValue} setEditValue={setEditValue} startEdit={startEdit} commitEdit={commitEdit} />
-                        {/* ucet_s_dph — computed, read only */}
+                        {/* S DPH (účet) — computed */}
                         <td style={{ padding: '9px 10px', textAlign: 'right' }}>
-                          <span style={{ fontSize: 13, color: row.ucet_s_dph === 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)' }}>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: row.ucet_s_dph === 0 ? 'var(--text-tertiary)' : 'var(--text-primary)' }}>
                             {row.ucet_s_dph === 0 ? '—' : fmt(row.ucet_s_dph)}
                           </span>
                         </td>
-                        <NumCell row={row} field="cl_bez_dph" editingCell={editingCell} editValue={editValue} setEditValue={setEditValue} startEdit={startEdit} commitEdit={commitEdit} />
-                        {/* cl_s_dph — computed, read only */}
+                        {/* CL bez DPH */}
+                        <NumCell row={row} field="cl_bez_dph" editingCell={editingCell} editValue={editValue} setEditValue={setEditValue} startEdit={startEdit} commitEdit={commitEdit} muted />
+                        {/* CL s DPH — computed */}
                         <td style={{ padding: '9px 10px', textAlign: 'right' }}>
                           <span style={{ fontSize: 13, color: row.cl_s_dph === 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)' }}>
                             {row.cl_s_dph === 0 ? '—' : fmt(row.cl_s_dph)}
                           </span>
                         </td>
-                        <td style={{ padding: '9px 10px', textAlign: 'right' }}><DiffBadge value={diffEx} /></td>
+                        {/* Rozdíl s DPH */}
                         <td style={{ padding: '9px 10px', textAlign: 'right' }}><DiffBadge value={diffVat} /></td>
+                        {/* Stav */}
                         <td style={{ padding: '9px 10px' }}>
                           <select
                             value={row.stav}
@@ -367,6 +329,7 @@ export default function Home() {
                             <option value="rozdil">△ Rozdíl</option>
                           </select>
                         </td>
+                        {/* Poznámka */}
                         <td style={{ padding: '9px 10px' }}>
                           <EditCell
                             isEditing={editingCell?.id === row.id && editingCell.field === 'poznamka'}
@@ -374,9 +337,10 @@ export default function Home() {
                             display={row.poznamka || <span style={{ color: 'var(--text-tertiary)' }}>—</span>}
                             onChange={setEditValue}
                             onStart={() => startEdit(row.id, 'poznamka', row.poznamka)}
-                            onCommit={commitEdit} isText
+                            onCommit={commitEdit}
                           />
                         </td>
+                        {/* Smazat */}
                         <td style={{ padding: '9px 6px', textAlign: 'center' }}>
                           <button onClick={() => deleteRow(row.id)} style={{
                             background: 'none', border: 'none', cursor: 'pointer',
@@ -424,97 +388,6 @@ export default function Home() {
           )}
         </div>
       </main>
-
-      {/* Import Modal */}
-      {importing && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50
-        }} onClick={e => { if (e.target === e.currentTarget) { setImporting(false); setImportPreview(null) } }}>
-          <div style={{
-            background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)',
-            width: 620, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden'
-          }}>
-            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <h2 style={{ fontSize: 16, fontWeight: 600 }}>Import ze screenshotu</h2>
-                  <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>Zkontroluj položky a uprav DPH sazbu dle potřeby</p>
-                </div>
-                <button onClick={() => { setImporting(false); setImportPreview(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: 20, lineHeight: 1, padding: 4 }}>×</button>
-              </div>
-              <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Importovat jako:</span>
-                {(['cl', 'ucet'] as const).map(src => (
-                  <button key={src} onClick={() => setImportSource(src)} style={{
-                    padding: '4px 12px', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                    background: importSource === src ? 'var(--accent)' : 'transparent',
-                    color: importSource === src ? 'white' : 'var(--text-secondary)',
-                    border: `1px solid ${importSource === src ? 'var(--accent)' : 'var(--border)'}`,
-                  }}>
-                    {src === 'cl' ? 'Costlocker (CL)' : 'Z účtu'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px' }}>
-              {importLoading ? (
-                <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-                  Claude čte screenshot…
-                </div>
-              ) : importPreview?.length === 0 ? (
-                <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-                  Nepodařilo se najít žádné položky. Zkus jiný screenshot.
-                </div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                      {['Název', 'Bez DPH', 'DPH %', 'S DPH'].map(h => (
-                        <th key={h} style={{ textAlign: h === 'Název' ? 'left' : 'right', padding: '6px 8px', fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {importPreview?.map((item, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '9px 8px' }}>{item.nazev}</td>
-                        <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmt(item.cl_bez_dph)}</td>
-                        <td style={{ padding: '9px 8px', textAlign: 'right' }}>
-                          <select
-                            value={item.dph_sazba}
-                            onChange={e => {
-                              const updated = [...(importPreview || [])]
-                              updated[i] = { ...updated[i], dph_sazba: parseInt(e.target.value) }
-                              setImportPreview(updated)
-                            }}
-                            style={{ border: '1px solid var(--border)', borderRadius: 4, fontSize: 12, padding: '2px 4px', background: 'var(--bg)', cursor: 'pointer' }}
-                          >
-                            {DPH_SAZBY.map(s => <option key={s} value={s}>{s} %</option>)}
-                          </select>
-                        </td>
-                        <td style={{ padding: '9px 8px', textAlign: 'right', color: 'var(--text-secondary)' }}>
-                          {fmt(calcSDph(item.cl_bez_dph, item.dph_sazba))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-
-            {!importLoading && importPreview && importPreview.length > 0 && (
-              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button onClick={() => { setImporting(false); setImportPreview(null) }} style={{ padding: '8px 16px', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13 }}>Zrušit</button>
-                <button onClick={() => confirmImport(importPreview)} style={{ padding: '8px 16px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500 }}>
-                  Importovat {importPreview.length} {importPreview.length === 1 ? 'položku' : importPreview.length < 5 ? 'položky' : 'položek'}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -547,8 +420,8 @@ function DiffBadge({ value }: { value: number }) {
   )
 }
 
-function NumCell({ row, field, editingCell, editValue, setEditValue, startEdit, commitEdit }: {
-  row: Naklad; field: keyof Naklad; editingCell: EditingCell; editValue: string;
+function NumCell({ row, field, editingCell, editValue, setEditValue, startEdit, commitEdit, muted }: {
+  row: Naklad; field: keyof Naklad; editingCell: EditingCell; editValue: string; muted?: boolean
   setEditValue: (v: string) => void; startEdit: (id: string, field: keyof Naklad, v: string | number) => void; commitEdit: () => void
 }) {
   const isEditing = editingCell?.id === row.id && editingCell.field === field
@@ -564,7 +437,7 @@ function NumCell({ row, field, editingCell, editValue, setEditValue, startEdit, 
         />
       ) : (
         <span onClick={() => startEdit(row.id, field, val)}
-          style={{ cursor: 'text', fontSize: 13, color: val === 0 ? 'var(--text-tertiary)' : 'var(--text-primary)' }}
+          style={{ cursor: 'text', fontSize: 13, color: val === 0 ? 'var(--text-tertiary)' : muted ? 'var(--text-secondary)' : 'var(--text-primary)' }}
           title="Klikni pro úpravu"
         >
           {val === 0 ? '—' : fmt(val)}
@@ -574,9 +447,9 @@ function NumCell({ row, field, editingCell, editValue, setEditValue, startEdit, 
   )
 }
 
-function EditCell({ isEditing, value, display, onChange, onStart, onCommit, isText }: {
+function EditCell({ isEditing, value, display, onChange, onStart, onCommit }: {
   isEditing: boolean; value: string; display: React.ReactNode; onChange: (v: string) => void;
-  onStart: () => void; onCommit: () => void; isText?: boolean
+  onStart: () => void; onCommit: () => void
 }) {
   return isEditing ? (
     <input autoFocus type="text" value={value}
