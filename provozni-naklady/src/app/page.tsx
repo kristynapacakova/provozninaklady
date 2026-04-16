@@ -59,6 +59,7 @@ export default function Home() {
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [modalRow, setModalRow] = useState<ModalRow>(emptyModal())
+  const [importModalOpen, setImportModalOpen] = useState(false)
   const [copying, setCopying] = useState(false)
   const [copyMsg, setCopyMsg] = useState('')
   const dragId = useRef<string|null>(null)
@@ -270,13 +271,22 @@ export default function Home() {
               <h1 style={{fontSize:22,fontWeight:600,color:'var(--text-primary)',marginBottom:2}}>Provozní náklady — {MONTHS[mesic-1]} {rok}</h1>
               <p style={{fontSize:13,color:'var(--text-secondary)'}}>Reálné platby z účtu · Cash flow pohled</p>
             </div>
-            <button onClick={() => setModalOpen(true)} style={{
-              display:'flex',alignItems:'center',gap:6,padding:'8px 14px',
-              background:'var(--accent)',color:'var(--accent-text)',border:'none',borderRadius:8,fontWeight:500,fontSize:13
-            }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Přidat položku
-            </button>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <button onClick={() => setImportModalOpen(true)} style={{
+                display:'flex',alignItems:'center',gap:6,padding:'8px 14px',
+                background:'var(--surface)',color:'var(--text-primary)',border:'1px solid var(--border-strong)',borderRadius:8,fontWeight:500,fontSize:13,cursor:'pointer'
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Importovat z banky/CL
+              </button>
+              <button onClick={() => setModalOpen(true)} style={{
+                display:'flex',alignItems:'center',gap:6,padding:'8px 14px',
+                background:'var(--accent)',color:'var(--accent-text)',border:'none',borderRadius:8,fontWeight:500,fontSize:13,cursor:'pointer'
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Přidat položku
+              </button>
+            </div>
           </div>
 
           {/* Summary cards */}
@@ -458,6 +468,45 @@ export default function Home() {
             <div style={{padding:'16px 24px',borderTop:'1px solid var(--border)',display:'flex',gap:8,justifyContent:'flex-end'}}>
               <button onClick={()=>{setModalOpen(false);setModalRow(emptyModal())}} style={{padding:'8px 16px',background:'transparent',color:'var(--text-secondary)',border:'1px solid var(--border)',borderRadius:8,fontSize:13,cursor:'pointer'}}>Zrušit</button>
               <button onClick={saveModal} disabled={!modalRow.nazev.trim()} style={{padding:'8px 20px',background:'var(--accent)',color:'white',border:'none',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer',opacity:modalRow.nazev.trim()?1:0.5}}>Přidat</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import modal */}
+      {importModalOpen && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100}}
+          onClick={e=>{if(e.target===e.currentTarget)setImportModalOpen(false)}}>
+          <div style={{background:'var(--surface)',borderRadius:12,border:'1px solid var(--border)',width:500,overflow:'hidden'}}>
+            <div style={{padding:'20px 24px 16px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div>
+                <h2 style={{fontSize:16,fontWeight:600,margin:0}}>Import z banky / Costlocker</h2>
+                <p style={{fontSize:12,color:'var(--text-secondary)',margin:'4px 0 0'}}>Nahrání screenshotů a automatické vyplnění</p>
+              </div>
+              <button onClick={()=>setImportModalOpen(false)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-tertiary)',fontSize:20,padding:4}}>×</button>
+            </div>
+            <div style={{padding:'20px 24px'}}>
+              <div style={{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:8,padding:'12px 14px',marginBottom:16,display:'flex',gap:10}}>
+                <span style={{fontSize:16}}>⚠️</span>
+                <div>
+                  <div style={{fontSize:13,fontWeight:500,color:'#92400e'}}>Tato funkce vyžaduje Anthropic API kredit</div>
+                  <div style={{fontSize:12,color:'#92400e',marginTop:3,lineHeight:1.5}}>
+                    OCR import funguje přes Claude Vision API. Dobij kredit na <strong>console.anthropic.com</strong> → Plans &amp; Billing, pak bude funkce aktivní.
+                  </div>
+                </div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                {['Bankovní výpis','Costlocker screenshot'].map(label => (
+                  <div key={label} style={{border:'2px dashed var(--border)',borderRadius:8,padding:'20px 16px',textAlign:'center',opacity:0.5}}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{color:'var(--text-tertiary)',margin:'0 auto 8px',display:'block'}}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <div style={{fontSize:12,color:'var(--text-tertiary)',fontWeight:500}}>{label}</div>
+                    <div style={{fontSize:11,color:'var(--text-tertiary)',marginTop:4}}>Vyžaduje API kredit</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{padding:'14px 24px',borderTop:'1px solid var(--border)',display:'flex',justifyContent:'flex-end'}}>
+              <button onClick={()=>setImportModalOpen(false)} style={{padding:'8px 16px',background:'transparent',color:'var(--text-secondary)',border:'1px solid var(--border)',borderRadius:8,fontSize:13,cursor:'pointer'}}>Zavřít</button>
             </div>
           </div>
         </div>
