@@ -127,6 +127,15 @@ export default function Home() {
   const totalSDph = rows.reduce((s,r) => s + r.ucet_s_dph, 0)
   const totalCl = rows.reduce((s,r) => s + r.cl_bez_dph, 0)
   const totalDiff = totalBezDph - totalCl
+  const totalDiffSDph = totalSDph - totalCl
+
+  // Roční součty — měsíční * 12, kvartální * 4, pololetní * 2, roční * 1, jednorázové * 1
+  const multMap: Record<string, number> = { 'měsíčně': 12, 'kvartálně': 4, 'pololetně': 2, 'ročně': 1, 'jednorázově': 1 }
+  const totalRocneBezDph = rows.reduce((s,r) => s + r.ucet_bez_dph * (multMap[r.pravidelnost||'měsíčně']||12), 0)
+  const totalRocneSDph = rows.reduce((s,r) => s + r.ucet_s_dph * (multMap[r.pravidelnost||'měsíčně']||12), 0)
+  const totalRocneCl = rows.reduce((s,r) => s + r.cl_bez_dph * (multMap[r.pravidelnost||'měsíčně']||12), 0)
+  const totalRocneDiff = totalRocneBezDph - totalRocneCl
+
   const countOk = rows.filter(r => r.stav === 'ok').length
   const countChybi = rows.filter(r => r.stav === 'chybi').length
   const countRozdil = rows.filter(r => r.stav === 'rozdil').length
@@ -215,27 +224,42 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Summary cards — barevné */}
-          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,paddingBottom:20}}>
-            <div style={{borderRadius:8,padding:'14px 16px',background:'#EAF3DE',border:'1px solid #C0DD97'}}>
-              <div style={{fontSize:11,color:'#3B6D11',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>Celkem bez DPH</div>
-              <div style={{fontSize:20,fontWeight:600,color:'#27500A'}}>{fmt(totalBezDph)}</div>
-              <div style={{fontSize:12,color:'#3B6D11',marginTop:1}}>z účtu</div>
+          {/* Summary cards */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:10,paddingBottom:20}}>
+            {/* Náklady měsíčně bez DPH */}
+            <div style={{borderRadius:8,padding:'12px 14px',background:'var(--surface)',border:'1px solid var(--border)'}}>
+              <div style={{fontSize:10,color:'var(--text-tertiary)',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>Náklady / měsíc</div>
+              <div style={{fontSize:17,fontWeight:600,color:'var(--text-primary)'}}>{fmt(totalBezDph)}</div>
+              <div style={{fontSize:11,color:'var(--text-tertiary)',marginTop:2}}>{fmt(totalSDph)} s DPH</div>
             </div>
-            <div style={{borderRadius:8,padding:'14px 16px',background:'#E6F1FB',border:'1px solid #B5D4F4'}}>
-              <div style={{fontSize:11,color:'#185FA5',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>Celkem s DPH</div>
-              <div style={{fontSize:20,fontWeight:600,color:'#0C447C'}}>{fmt(totalSDph)}</div>
-              <div style={{fontSize:12,color:'#185FA5',marginTop:1}}>z účtu</div>
+            {/* Náklady ročně */}
+            <div style={{borderRadius:8,padding:'12px 14px',background:'var(--surface)',border:'1px solid var(--border)'}}>
+              <div style={{fontSize:10,color:'var(--text-tertiary)',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>Náklady / rok</div>
+              <div style={{fontSize:17,fontWeight:600,color:'var(--text-primary)'}}>{fmt(totalRocneBezDph)}</div>
+              <div style={{fontSize:11,color:'var(--text-tertiary)',marginTop:2}}>{fmt(totalRocneSDph)} s DPH</div>
             </div>
-            <div style={{borderRadius:8,padding:'14px 16px',background:'#EEEDFE',border:'1px solid #CECBF6'}}>
-              <div style={{fontSize:11,color:'#534AB7',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>Costlocker</div>
-              <div style={{fontSize:20,fontWeight:600,color:'#3C3489'}}>{fmt(totalCl)}</div>
-              <div style={{fontSize:12,color:'#534AB7',marginTop:1}}>bez DPH</div>
+            {/* Oddělovač */}
+            <div style={{borderRadius:8,padding:'12px 14px',background:'#E6F1FB',border:'1px solid #B5D4F4'}}>
+              <div style={{fontSize:10,color:'#185FA5',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>CL / měsíc</div>
+              <div style={{fontSize:17,fontWeight:600,color:'#0C447C'}}>{fmt(totalCl)}</div>
+              <div style={{fontSize:11,color:'#185FA5',marginTop:2}}>bez DPH</div>
             </div>
-            <div style={{borderRadius:8,padding:'14px 16px',background:totalDiff===0?'#F1EFE8':totalDiff>0?'#FCEBEB':'#EAF3DE',border:`1px solid ${totalDiff===0?'#D3D1C7':totalDiff>0?'#F7C1C1':'#C0DD97'}`}}>
-              <div style={{fontSize:11,color:totalDiff===0?'#5F5E5A':totalDiff>0?'#A32D2D':'#3B6D11',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>Rozdíl</div>
-              <div style={{fontSize:20,fontWeight:600,color:totalDiff===0?'#444441':totalDiff>0?'#791F1F':'#27500A'}}>{fmtDiff(totalDiff)}</div>
-              <div style={{fontSize:12,color:totalDiff===0?'#5F5E5A':totalDiff>0?'#A32D2D':'#3B6D11',marginTop:1}}>účet vs. CL (bez DPH)</div>
+            <div style={{borderRadius:8,padding:'12px 14px',background:'#E6F1FB',border:'1px solid #B5D4F4'}}>
+              <div style={{fontSize:10,color:'#185FA5',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>CL / rok</div>
+              <div style={{fontSize:17,fontWeight:600,color:'#0C447C'}}>{fmt(totalRocneCl)}</div>
+              <div style={{fontSize:11,color:'#185FA5',marginTop:2}}>bez DPH</div>
+            </div>
+            {/* Rozdíl měsíčně */}
+            <div style={{borderRadius:8,padding:'12px 14px',background:'#FAEEDA',border:'1px solid #FAC775'}}>
+              <div style={{fontSize:10,color:'#854F0B',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>Rozdíl / měsíc</div>
+              <div style={{fontSize:17,fontWeight:600,color:'#633806'}}>{fmtDiff(totalDiff)}</div>
+              <div style={{fontSize:11,color:'#854F0B',marginTop:2}}>účet vs. CL</div>
+            </div>
+            {/* Rozdíl ročně */}
+            <div style={{borderRadius:8,padding:'12px 14px',background:'#FAEEDA',border:'1px solid #FAC775'}}>
+              <div style={{fontSize:10,color:'#854F0B',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>Rozdíl / rok</div>
+              <div style={{fontSize:17,fontWeight:600,color:'#633806'}}>{fmtDiff(totalRocneDiff)}</div>
+              <div style={{fontSize:11,color:'#854F0B',marginTop:2}}>účet vs. CL</div>
             </div>
           </div>
         </div>
