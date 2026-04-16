@@ -37,8 +37,8 @@ function getStav(bezDph: number, cl: number, currentStav?: string): Naklad['stav
 }
 
 type EditingCell = { id: string; field: keyof Naklad } | null
-type ModalRow = { nazev: string; ucet_bez_dph: string; dph_sazba: number; cl_bez_dph: string; pravidelnost: string; kategorie: string; stav: Naklad['stav']; poznamka: string }
-const emptyModal = (): ModalRow => ({ nazev:'', ucet_bez_dph:'', dph_sazba:21, cl_bez_dph:'', pravidelnost:'měsíčně', kategorie:'—', stav:'chybi', poznamka:'' })
+type ModalRow = { nazev: string; ucet_bez_dph: string; dph_sazba: number; cl_bez_dph: string; pravidelnost: string; kategorie: string; stav: Naklad['stav']; poznamka: string; mesic: number }
+const emptyModal = (m: number): ModalRow => ({ nazev:'', ucet_bez_dph:'', dph_sazba:21, cl_bez_dph:'', pravidelnost:'měsíčně', kategorie:'—', stav:'chybi', poznamka:'', mesic: m })
 
 const STAV_CFG: Record<string, {label:string;color:string}> = {
   ok:{label:'✓ Souhlasí',color:'var(--green)'},
@@ -58,7 +58,12 @@ export default function Home() {
   const [filter, setFilter] = useState<'vse'|'ok'|'chybi'|'rozdil'|'smazat'>('vse')
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
-  const [modalRow, setModalRow] = useState<ModalRow>(emptyModal())
+  const [modalRow, setModalRow] = useState<ModalRow>(emptyModal(new Date().getMonth() + 1))
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editModalRow, setEditModalRow] = useState<ModalRow & {id:string}|null>(null)
+  const [moveDropdownId, setMoveDropdownId] = useState<string|null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false)
   const [importModalOpen, setImportModalOpen] = useState(false)
   const [copying, setCopying] = useState(false)
   const [copyMsg, setCopyMsg] = useState('')
@@ -98,21 +103,82 @@ export default function Home() {
 
   async function saveModal() {
     if (!modalRow.nazev.trim()) return
+    const targetMesic = modalRow.mesic
     const maxPoradi = rows.length ? Math.max(...rows.map(r => r.poradi)) + 1 : 1
     const bezDph = parseFloat(modalRow.ucet_bez_dph) || 0
     const cl = parseFloat(modalRow.cl_bez_dph) || 0
     const stav = modalRow.stav !== 'smazat' ? getStav(bezDph, cl) : 'smazat'
     const { data } = await supabase.from('naklady').insert({
-      mesic, rok, nazev: modalRow.nazev.trim(),
+      mesic: targetMesic, rok, nazev: modalRow.nazev.trim(),
       ucet_bez_dph: bezDph, cl_bez_dph: cl,
       ucet_s_dph: calcSDph(bezDph, modalRow.dph_sazba), cl_s_dph: 0,
       dph_sazba: modalRow.dph_sazba, pravidelnost: modalRow.pravidelnost,
       kategorie: modalRow.kategorie === '—' ? '' : modalRow.kategorie,
       stav, poznamka: modalRow.poznamka, poradi: maxPoradi
     }).select().single()
-    if (data) setRows(prev => [...prev, data])
-    setModalRow(emptyModal())
+    if (data && targetMesic === mesic) setRows(prev => [...prev, data])
+    setModalRow(emptyModal(mesic))
     setModalOpen(false)
+  }
+
+  function openEditModal(row: Naklad) {
+    setEditModalRow({
+      id: row.id, mesic: row.mesic, nazev: row.nazev,
+      ucet_bez_dph: String(row.ucet_bez_dph), dph_sazba: row.dph_sazba,
+      cl_bez_dph: String(row.cl_bez_dph), pravidelnost: row.pravidelnost,
+      kategorie: row.kategorie || '—', stav: row.stav, poznamka: row.poznamka
+    })
+    setEditModalOpen(true)
+  }
+
+  async function saveEditModal() {
+    if (!editModalRow || !editModalRow.nazev.trim()) return
+    const bezDph = parseFloat(editModalRow.ucet_bez_dph) || 0
+    const cl = parseFloat(editModalRow.cl_bez_dph) || 0
+    const stav = editModalRow.stav !== 'smazat' ? getStav(bezDph, cl) : 'smazat'
+    const updates = {
+      mesic: editModalRow.mesic, nazev: editModalRow.nazev.trim(),
+      ucet_bez_dph: bezDph, cl_bez_dph: cl,
+      ucet_s_dph: calcSDph(bezDph, editModalRow.dph_sazba), cl_s_dph: 0,
+      dph_sazba: editModalRow.dph_sazba, pravidelnost: editModalRow.pravidelnost,
+      kategorie: editModalRow.kategorie === '—' ? '' : editModalRow.kategorie,
+      stav, poznamka: editModalRow.poznamka
+    }
+    await supabase.from('naklady').update(updates).eq('id', editModalRow.id)
+    // If month changed, remove from current view
+    if (editModalRow.mesic !== mesic) {
+      setRows(prev => prev.filter(r => r.id !== editModalRow.id))
+    } else {
+      setRows(prev => prev.map(r => r.id === editModalRow.id ? { ...r, ...updates } : r))
+    }
+    setEditModalOpen(false)
+    setEditModalRow(null)
+  }
+
+  async function moveRowToMonth(id: string, targetMesic: number) {
+    await supabase.from('naklady').update({ mesic: targetMesic }).eq('id', id)
+    setRows(prev => prev.filter(r => r.id !== id))
+    setMoveDropdownId(null)
+  }
+
+  async function bulkMoveToMonth(targetMesic: number) {
+    const ids = Array.from(selected)
+    await Promise.all(ids.map(id => supabase.from('naklady').update({ mesic: targetMesic }).eq('id', id)))
+    setRows(prev => prev.filter(r => !selected.has(r.id)))
+    setSelected(new Set())
+    setBulkMoveOpen(false)
+  }
+
+  function toggleSelect(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+  function toggleSelectAll() {
+    if (selected.size === filtered.length) setSelected(new Set())
+    else setSelected(new Set(filtered.map(r => r.id)))
   }
 
   async function deleteRow(id: string) {
@@ -279,7 +345,7 @@ export default function Home() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Importovat z banky/CL
               </button>
-              <button onClick={() => setModalOpen(true)} style={{
+              <button onClick={() => { setModalRow(emptyModal(mesic)); setModalOpen(true) }} style={{
                 display:'flex',alignItems:'center',gap:6,padding:'8px 14px',
                 background:'var(--accent)',color:'var(--accent-text)',border:'none',borderRadius:8,fontWeight:500,fontSize:13,cursor:'pointer'
               }}>
@@ -320,14 +386,40 @@ export default function Home() {
             <span style={{fontSize:12,color:'var(--text-tertiary)',marginLeft:'auto'}}>{filtered.length} / {rows.length} položek</span>
           </div>
 
+          {/* Bulk action bar */}
+          {selected.size > 0 && (
+            <div style={{marginBottom:10,display:'flex',alignItems:'center',gap:10,padding:'8px 14px',background:'var(--bg)',borderRadius:8,border:'1px solid var(--border)'}}>
+              <span style={{fontSize:13,fontWeight:500,color:'var(--text-primary)'}}>{selected.size} vybraných</span>
+              <div style={{position:'relative'}}>
+                <button onClick={() => setBulkMoveOpen(v=>!v)} style={{padding:'6px 12px',background:'var(--accent)',color:'white',border:'none',borderRadius:6,fontSize:12,fontWeight:500,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  Přesunout do…
+                </button>
+                {bulkMoveOpen && (
+                  <div style={{position:'absolute',top:'calc(100% + 4px)',left:0,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,boxShadow:'0 4px 16px rgba(0,0,0,0.1)',zIndex:50,minWidth:160,overflow:'hidden'}}>
+                    {MONTHS.map((m,i) => i+1 !== mesic && (
+                      <button key={i} onClick={() => bulkMoveToMonth(i+1)} style={{display:'block',width:'100%',textAlign:'left',padding:'8px 14px',background:'none',border:'none',fontSize:13,cursor:'pointer',color:'var(--text-primary)'}}
+                        onMouseEnter={e=>(e.currentTarget.style.background='var(--bg)')}
+                        onMouseLeave={e=>(e.currentTarget.style.background='none')}>
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button onClick={() => setSelected(new Set())} style={{padding:'6px 10px',background:'transparent',color:'var(--text-secondary)',border:'1px solid var(--border)',borderRadius:6,fontSize:12,cursor:'pointer'}}>Zrušit výběr</button>
+            </div>
+          )}
+
           {loading ? (
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:200,color:'var(--text-tertiary)'}}>Načítám…</div>
           ) : (
             <div style={{background:'var(--surface)',borderRadius:10,border:'1px solid var(--border)',overflow:'hidden',minWidth:1050}}>
               <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
                 <colgroup>
-                  <col style={{width:'28px'}}/>
-                  <col style={{width:'15%'}}/>
+                  <col style={{width:'32px'}}/>{/* checkbox */}
+                  <col style={{width:'28px'}}/>{/* drag */}
+                  <col style={{width:'14%'}}/>
                   <col style={{width:'9%'}}/>
                   <col style={{width:'9%'}}/>
                   <col style={{width:'9%'}}/>
@@ -336,23 +428,30 @@ export default function Home() {
                   <col style={{width:'9%'}}/>
                   <col style={{width:'9%'}}/>
                   <col style={{width:'10%'}}/>
-                  <col style={{width:'28px'}}/>
+                  <col style={{width:'60px'}}/>{/* actions */}
                 </colgroup>
                 <thead>
                   <tr style={{borderBottom:'1px solid var(--border)',background:'#fafaf8'}}>
+                    <th style={{width:32,padding:'0 4px',textAlign:'center'}}>
+                      <input type="checkbox" checked={selected.size===filtered.length&&filtered.length>0} onChange={toggleSelectAll} style={{cursor:'pointer',width:13,height:13}}/>
+                    </th>
                     <th style={{width:28}}/>
                     {['Název','Kategorie','Pravidelnost','Cena bez DPH','DPH %','Cena s DPH','CL','Rozdíl','Stav','Poznámka'].map((l,i) => (
                       <th key={i} style={{padding:'10px 8px',textAlign:i>=3&&i<=7?'right':'left',fontSize:11,fontWeight:500,color:'var(--text-tertiary)',letterSpacing:'0.05em',textTransform:'uppercase',whiteSpace:'nowrap'}}>{l}</th>
                     ))}
-                    <th style={{width:28}}/>
+                    <th style={{width:60}}/>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((row,idx) => {
                     const diff = row.ucet_bez_dph - row.cl_bez_dph
+                    const isSelected = selected.has(row.id)
                     return (
                       <tr key={row.id} draggable onDragStart={()=>onDragStart(row.id)} onDragOver={e=>onDragOver(e,row.id)} onDrop={onDrop}
-                        style={{borderBottom:idx<filtered.length-1?'1px solid var(--border)':'none',background:saving===row.id?'#fafaf8':undefined}}>
+                        style={{borderBottom:idx<filtered.length-1?'1px solid var(--border)':'none',background:isSelected?'#f0f7ff':saving===row.id?'#fafaf8':undefined}}>
+                        <td style={{padding:'0 4px',textAlign:'center'}}>
+                          <input type="checkbox" checked={isSelected} onChange={()=>toggleSelect(row.id)} style={{cursor:'pointer',width:13,height:13}}/>
+                        </td>
                         <td style={{padding:'9px 4px',textAlign:'center',color:'var(--text-tertiary)',cursor:'grab',userSelect:'none',fontSize:14}}>⠿</td>
                         <td style={{padding:'9px 8px',overflow:'hidden'}}>
                           <EditCell isEditing={editingCell?.id===row.id&&editingCell.field==='nazev'} value={editValue} display={row.nazev||'—'} onChange={setEditValue} onStart={()=>startEdit(row.id,'nazev',row.nazev)} onCommit={commitEdit}/>
@@ -398,8 +497,32 @@ export default function Home() {
                         <td style={{padding:'9px 8px',overflow:'hidden'}}>
                           <EditCell isEditing={editingCell?.id===row.id&&editingCell.field==='poznamka'} value={editValue} display={row.poznamka||<span style={{color:'var(--text-tertiary)'}}>—</span>} onChange={setEditValue} onStart={()=>startEdit(row.id,'poznamka',row.poznamka)} onCommit={commitEdit}/>
                         </td>
-                        <td style={{padding:'9px 4px',textAlign:'center'}}>
-                          <button onClick={()=>deleteRow(row.id)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-tertiary)',padding:4,borderRadius:4,opacity:0.4}} onMouseEnter={e=>(e.currentTarget.style.opacity='1')} onMouseLeave={e=>(e.currentTarget.style.opacity='0.4')}>
+                        {/* Action buttons: edit + move + delete */}
+                        <td style={{padding:'9px 4px',textAlign:'right',whiteSpace:'nowrap'}}>
+                          <button onClick={()=>openEditModal(row)} title="Upravit / přesunout" style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-tertiary)',padding:'2px 4px',borderRadius:4,opacity:0.5}}
+                            onMouseEnter={e=>(e.currentTarget.style.opacity='1')} onMouseLeave={e=>(e.currentTarget.style.opacity='0.5')}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          </button>
+                          <div style={{position:'relative',display:'inline-block'}}>
+                            <button onClick={()=>setMoveDropdownId(moveDropdownId===row.id?null:row.id)} title="Přesunout do měsíce" style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-tertiary)',padding:'2px 4px',borderRadius:4,opacity:0.5}}
+                              onMouseEnter={e=>(e.currentTarget.style.opacity='1')} onMouseLeave={e=>(e.currentTarget.style.opacity='0.5')}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                            </button>
+                            {moveDropdownId===row.id&&(
+                              <div style={{position:'absolute',right:0,top:'calc(100% + 2px)',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,boxShadow:'0 4px 16px rgba(0,0,0,0.1)',zIndex:50,minWidth:140,overflow:'hidden'}}>
+                                <div style={{padding:'6px 10px',fontSize:10,fontWeight:600,color:'var(--text-tertiary)',textTransform:'uppercase',letterSpacing:'0.05em',borderBottom:'1px solid var(--border)'}}>Přesunout do</div>
+                                {MONTHS.map((m,i) => i+1!==mesic&&(
+                                  <button key={i} onClick={()=>moveRowToMonth(row.id,i+1)} style={{display:'block',width:'100%',textAlign:'left',padding:'7px 12px',background:'none',border:'none',fontSize:12,cursor:'pointer',color:'var(--text-primary)'}}
+                                    onMouseEnter={e=>(e.currentTarget.style.background='var(--bg)')}
+                                    onMouseLeave={e=>(e.currentTarget.style.background='none')}>
+                                    {m}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <button onClick={()=>deleteRow(row.id)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-tertiary)',padding:'2px 4px',borderRadius:4,opacity:0.4}}
+                            onMouseEnter={e=>(e.currentTarget.style.opacity='1')} onMouseLeave={e=>(e.currentTarget.style.opacity='0.4')}>
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                           </button>
                         </td>
@@ -407,7 +530,7 @@ export default function Home() {
                     )
                   })}
                   {filtered.length===0&&(
-                    <tr><td colSpan={11} style={{padding:'40px',textAlign:'center',color:'var(--text-tertiary)'}}>
+                    <tr><td colSpan={12} style={{padding:'40px',textAlign:'center',color:'var(--text-tertiary)'}}>
                       {search ? `Žádné výsledky pro "${search}"` : 'Žádné položky.'}
                     </td></tr>
                   )}
@@ -421,16 +544,23 @@ export default function Home() {
       {/* Modal pro přidání položky */}
       {modalOpen && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100}}
-          onClick={e => { if(e.target===e.currentTarget){setModalOpen(false);setModalRow(emptyModal())} }}>
+          onClick={e => { if(e.target===e.currentTarget){setModalOpen(false);setModalRow(emptyModal(mesic))} }}>
           <div style={{background:'var(--surface)',borderRadius:12,border:'1px solid var(--border)',width:520,maxHeight:'90vh',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{padding:'20px 24px 16px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <h2 style={{fontSize:16,fontWeight:600}}>Přidat položku</h2>
-              <button onClick={()=>{setModalOpen(false);setModalRow(emptyModal())}} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-tertiary)',fontSize:20,lineHeight:1,padding:4}}>×</button>
+              <button onClick={()=>{setModalOpen(false);setModalRow(emptyModal(mesic))}} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-tertiary)',fontSize:20,lineHeight:1,padding:4}}>×</button>
             </div>
             <div style={{padding:'20px 24px',overflowY:'auto',display:'flex',flexDirection:'column',gap:14}}>
-              <Field label="Název">
-                <input autoFocus value={modalRow.nazev} onChange={e=>setModalRow(p=>({...p,nazev:e.target.value}))} onKeyDown={e=>{if(e.key==='Enter')saveModal()}} placeholder="Název položky…" style={inputSt}/>
-              </Field>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <Field label="Název">
+                  <input autoFocus value={modalRow.nazev} onChange={e=>setModalRow(p=>({...p,nazev:e.target.value}))} onKeyDown={e=>{if(e.key==='Enter')saveModal()}} placeholder="Název položky…" style={inputSt}/>
+                </Field>
+                <Field label="Měsíc">
+                  <select value={modalRow.mesic} onChange={e=>setModalRow(p=>({...p,mesic:parseInt(e.target.value)}))} style={inputSt}>
+                    {MONTHS.map((m,i)=><option key={i} value={i+1}>{m}</option>)}
+                  </select>
+                </Field>
+              </div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                 <Field label="Kategorie">
                   <select value={modalRow.kategorie} onChange={e=>setModalRow(p=>({...p,kategorie:e.target.value}))} style={inputSt}>
@@ -466,8 +596,82 @@ export default function Home() {
               </Field>
             </div>
             <div style={{padding:'16px 24px',borderTop:'1px solid var(--border)',display:'flex',gap:8,justifyContent:'flex-end'}}>
-              <button onClick={()=>{setModalOpen(false);setModalRow(emptyModal())}} style={{padding:'8px 16px',background:'transparent',color:'var(--text-secondary)',border:'1px solid var(--border)',borderRadius:8,fontSize:13,cursor:'pointer'}}>Zrušit</button>
-              <button onClick={saveModal} disabled={!modalRow.nazev.trim()} style={{padding:'8px 20px',background:'var(--accent)',color:'white',border:'none',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer',opacity:modalRow.nazev.trim()?1:0.5}}>Přidat</button>
+              <button onClick={()=>{setModalOpen(false);setModalRow(emptyModal(mesic))}} style={{padding:'8px 16px',background:'transparent',color:'var(--text-secondary)',border:'1px solid var(--border)',borderRadius:8,fontSize:13,cursor:'pointer'}}>Zrušit</button>
+              <button onClick={saveModal} disabled={!modalRow.nazev.trim()} style={{padding:'8px 20px',background:'var(--accent)',color:'white',border:'none',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer',opacity:modalRow.nazev.trim()?1:0.5}}>
+                {modalRow.mesic !== mesic ? `Přidat do ${MONTHS[modalRow.mesic-1]}` : 'Přidat'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal pro editaci existující položky */}
+      {editModalOpen && editModalRow && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100}}
+          onClick={e=>{if(e.target===e.currentTarget){setEditModalOpen(false);setEditModalRow(null)}}}>
+          <div style={{background:'var(--surface)',borderRadius:12,border:'1px solid var(--border)',width:520,maxHeight:'90vh',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{padding:'20px 24px 16px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div>
+                <h2 style={{fontSize:16,fontWeight:600,margin:0}}>Upravit položku</h2>
+                <p style={{fontSize:12,color:'var(--text-secondary)',margin:'4px 0 0'}}>Změna měsíce přesune položku do vybraného měsíce</p>
+              </div>
+              <button onClick={()=>{setEditModalOpen(false);setEditModalRow(null)}} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-tertiary)',fontSize:20,lineHeight:1,padding:4}}>×</button>
+            </div>
+            <div style={{padding:'20px 24px',overflowY:'auto',display:'flex',flexDirection:'column',gap:14}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <Field label="Název">
+                  <input autoFocus value={editModalRow.nazev} onChange={e=>setEditModalRow(p=>p?{...p,nazev:e.target.value}:p)} style={inputSt}/>
+                </Field>
+                <Field label="Měsíc">
+                  <select value={editModalRow.mesic} onChange={e=>setEditModalRow(p=>p?{...p,mesic:parseInt(e.target.value)}:p)} style={{...inputSt,borderColor:editModalRow.mesic!==mesic?'var(--amber)':undefined}}>
+                    {MONTHS.map((m,i)=><option key={i} value={i+1}>{m}{i+1===mesic?' (aktuální)':''}</option>)}
+                  </select>
+                </Field>
+              </div>
+              {editModalRow.mesic !== mesic && (
+                <div style={{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:7,padding:'8px 12px',fontSize:12,color:'#92400e'}}>
+                  ⚠️ Položka bude přesunuta do <strong>{MONTHS[editModalRow.mesic-1]}</strong> a zmizí z aktuálního přehledu.
+                </div>
+              )}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <Field label="Kategorie">
+                  <select value={editModalRow.kategorie} onChange={e=>setEditModalRow(p=>p?{...p,kategorie:e.target.value}:p)} style={inputSt}>
+                    {KATEGORIE.map(k=><option key={k} value={k}>{k}</option>)}
+                  </select>
+                </Field>
+                <Field label="Pravidelnost">
+                  <select value={editModalRow.pravidelnost} onChange={e=>setEditModalRow(p=>p?{...p,pravidelnost:e.target.value}:p)} style={inputSt}>
+                    {PRAVIDELNOST.map(pr=><option key={pr} value={pr}>{pr}</option>)}
+                  </select>
+                </Field>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 80px 1fr',gap:12,alignItems:'end'}}>
+                <Field label="Cena bez DPH">
+                  <input type="number" value={editModalRow.ucet_bez_dph} onChange={e=>setEditModalRow(p=>p?{...p,ucet_bez_dph:e.target.value}:p)} style={{...inputSt,textAlign:'right'}}/>
+                </Field>
+                <Field label="DPH %">
+                  <select value={editModalRow.dph_sazba} onChange={e=>setEditModalRow(p=>p?{...p,dph_sazba:parseInt(e.target.value)}:p)} style={inputSt}>
+                    {DPH_SAZBY.map(s=><option key={s} value={s}>{s} %</option>)}
+                  </select>
+                </Field>
+                <Field label="Cena s DPH">
+                  <div style={{...inputSt,color:'var(--text-tertiary)',display:'flex',alignItems:'center',justifyContent:'flex-end'}}>
+                    {editModalRow.ucet_bez_dph ? fmt(calcSDph(parseFloat(editModalRow.ucet_bez_dph)||0,editModalRow.dph_sazba)) : '—'}
+                  </div>
+                </Field>
+              </div>
+              <Field label="CL (bez DPH)">
+                <input type="number" value={editModalRow.cl_bez_dph} onChange={e=>setEditModalRow(p=>p?{...p,cl_bez_dph:e.target.value}:p)} style={{...inputSt,textAlign:'right'}}/>
+              </Field>
+              <Field label="Poznámka">
+                <input value={editModalRow.poznamka} onChange={e=>setEditModalRow(p=>p?{...p,poznamka:e.target.value}:p)} style={inputSt}/>
+              </Field>
+            </div>
+            <div style={{padding:'16px 24px',borderTop:'1px solid var(--border)',display:'flex',gap:8,justifyContent:'flex-end'}}>
+              <button onClick={()=>{setEditModalOpen(false);setEditModalRow(null)}} style={{padding:'8px 16px',background:'transparent',color:'var(--text-secondary)',border:'1px solid var(--border)',borderRadius:8,fontSize:13,cursor:'pointer'}}>Zrušit</button>
+              <button onClick={saveEditModal} style={{padding:'8px 20px',background:'var(--accent)',color:'white',border:'none',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer'}}>
+                {editModalRow.mesic !== mesic ? `Přesunout do ${MONTHS[editModalRow.mesic-1]}` : 'Uložit'}
+              </button>
             </div>
           </div>
         </div>
