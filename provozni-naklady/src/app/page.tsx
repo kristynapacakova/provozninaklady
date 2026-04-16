@@ -8,6 +8,17 @@ const DPH_SAZBY = [0, 10, 12, 21]
 const PRAVIDELNOST = ['měsíčně','kvartálně','pololetně','ročně','jednorázově']
 const KATEGORIE = ['—','mzdy','provozní náklady','software','občerstvení','doprava','rezerva','vzdělávání','benefity']
 
+function nextIn<T>(arr: T[], val: T): T {
+  const i = arr.indexOf(val)
+  return arr[(i + 1) % arr.length]
+}
+
+const KAT_COLORS: Record<string, string> = {
+  'mzdy': '#534AB7', 'provozní náklady': '#185FA5', 'software': '#0F6E56',
+  'občerstvení': '#854F0B', 'doprava': '#3B6D11', 'rezerva': '#6b6b67',
+  'vzdělávání': '#993556', 'benefity': '#993C1D', '—': 'var(--text-tertiary)'
+}
+
 function fmt(v: number) {
   return v.toLocaleString('cs-CZ', {minimumFractionDigits:0,maximumFractionDigits:0}) + ' Kč'
 }
@@ -338,25 +349,37 @@ export default function Home() {
                         <td style={{padding:'9px 8px',overflow:'hidden'}}>
                           <EditCell isEditing={editingCell?.id===row.id&&editingCell.field==='nazev'} value={editValue} display={row.nazev||'—'} onChange={setEditValue} onStart={() => startEdit(row.id,'nazev',row.nazev)} onCommit={commitEdit}/>
                         </td>
-                        {/* Kategorie */}
+                        {/* Kategorie — kliknutím cyklí */}
                         <td style={{padding:'9px 8px'}}>
-                          <select value={row.kategorie||'—'} onChange={e => updateField(row.id,'kategorie',e.target.value==='—'?'':e.target.value)} style={{border:'none',background:'transparent',fontSize:12,fontFamily:'var(--font)',cursor:'pointer',outline:'none',color:'var(--text-secondary)',width:'100%'}}>
-                            {KATEGORIE.map(k => <option key={k} value={k}>{k}</option>)}
-                          </select>
+                          <span
+                            onClick={() => updateField(row.id,'kategorie', nextIn(KATEGORIE, row.kategorie||'—')==='—'?'': nextIn(KATEGORIE, row.kategorie||'—'))}
+                            title="Klikni pro změnu"
+                            style={{cursor:'pointer',fontSize:12,fontWeight:500,color:KAT_COLORS[row.kategorie||'—'],whiteSpace:'nowrap'}}
+                          >
+                            {row.kategorie||'—'}
+                          </span>
                         </td>
-                        {/* Pravidelnost */}
+                        {/* Pravidelnost — kliknutím cyklí */}
                         <td style={{padding:'9px 8px'}}>
-                          <select value={row.pravidelnost||'měsíčně'} onChange={e => updateField(row.id,'pravidelnost',e.target.value)} style={{border:'none',background:'transparent',fontSize:12,fontFamily:'var(--font)',cursor:'pointer',outline:'none',color:'var(--text-secondary)',width:'100%'}}>
-                            {PRAVIDELNOST.map(p => <option key={p} value={p}>{p}</option>)}
-                          </select>
+                          <span
+                            onClick={() => updateField(row.id,'pravidelnost', nextIn(PRAVIDELNOST, row.pravidelnost||'měsíčně'))}
+                            title="Klikni pro změnu"
+                            style={{cursor:'pointer',fontSize:12,color:'var(--text-secondary)',whiteSpace:'nowrap'}}
+                          >
+                            {row.pravidelnost||'měsíčně'}
+                          </span>
                         </td>
                         {/* Cena bez DPH */}
                         <NumCell row={row} field="ucet_bez_dph" editingCell={editingCell} editValue={editValue} setEditValue={setEditValue} startEdit={startEdit} commitEdit={commitEdit}/>
-                        {/* DPH % */}
+                        {/* DPH % — kliknutím cyklí */}
                         <td style={{padding:'9px 4px',textAlign:'center'}}>
-                          <select value={row.dph_sazba??21} onChange={e => updateField(row.id,'dph_sazba',e.target.value)} style={{border:'1px solid var(--border)',background:'var(--bg)',borderRadius:5,fontSize:11,fontFamily:'var(--font)',cursor:'pointer',outline:'none',padding:'2px 2px',color:'var(--text-primary)',fontWeight:500,width:'100%',textAlign:'center'}}>
-                            {DPH_SAZBY.map(s => <option key={s} value={s}>{s}%</option>)}
-                          </select>
+                          <span
+                            onClick={() => updateField(row.id,'dph_sazba', nextIn(DPH_SAZBY, row.dph_sazba??21))}
+                            title="Klikni pro změnu"
+                            style={{cursor:'pointer',fontSize:12,fontWeight:500,color:'var(--text-secondary)',display:'inline-block',padding:'2px 6px',borderRadius:4,border:'1px solid var(--border)',background:'var(--bg)'}}
+                          >
+                            {row.dph_sazba??21} %
+                          </span>
                         </td>
                         {/* Cena s DPH */}
                         <td style={{padding:'9px 8px',textAlign:'right'}}>
@@ -398,23 +421,23 @@ export default function Home() {
                       <td style={{padding:'8px 8px'}}>
                         <input autoFocus value={newRow.nazev} onChange={e => setNewRow(p=>({...p,nazev:e.target.value}))} onKeyDown={e=>{if(e.key==='Enter')addRow();if(e.key==='Escape')setAddingRow(false)}} placeholder="Název…" style={{width:'100%',border:'1px solid var(--border-strong)',borderRadius:4,padding:'4px 6px',fontSize:13,outline:'none',background:'var(--surface)'}}/>
                       </td>
-                      <td style={{padding:'8px 6px'}}>
-                        <select value={newRow.kategorie} onChange={e => setNewRow(p=>({...p,kategorie:e.target.value}))} style={{width:'100%',border:'1px solid var(--border)',borderRadius:4,padding:'4px 4px',fontSize:12,background:'var(--surface)',outline:'none',color:'var(--text-secondary)'}}>
-                          {KATEGORIE.map(k => <option key={k} value={k}>{k}</option>)}
-                        </select>
+                      <td style={{padding:'8px 8px'}}>
+                        <span onClick={() => setNewRow(p=>({...p,kategorie:nextIn(KATEGORIE,p.kategorie)}))} title="Klikni pro změnu" style={{cursor:'pointer',fontSize:12,fontWeight:500,color:KAT_COLORS[newRow.kategorie]||'var(--text-tertiary)'}}>
+                          {newRow.kategorie}
+                        </span>
                       </td>
-                      <td style={{padding:'8px 6px'}}>
-                        <select value={newRow.pravidelnost} onChange={e => setNewRow(p=>({...p,pravidelnost:e.target.value}))} style={{width:'100%',border:'1px solid var(--border)',borderRadius:4,padding:'4px 4px',fontSize:12,background:'var(--surface)',outline:'none',color:'var(--text-secondary)'}}>
-                          {PRAVIDELNOST.map(p => <option key={p} value={p}>{p}</option>)}
-                        </select>
+                      <td style={{padding:'8px 8px'}}>
+                        <span onClick={() => setNewRow(p=>({...p,pravidelnost:nextIn(PRAVIDELNOST,p.pravidelnost)}))} title="Klikni pro změnu" style={{cursor:'pointer',fontSize:12,color:'var(--text-secondary)'}}>
+                          {newRow.pravidelnost}
+                        </span>
                       </td>
                       <td style={{padding:'8px 8px'}}>
                         <input type="number" value={newRow.ucet_bez_dph} onChange={e => setNewRow(p=>({...p,ucet_bez_dph:e.target.value}))} placeholder="0" style={{width:'100%',textAlign:'right',border:'1px solid var(--border)',borderRadius:4,padding:'4px 6px',fontSize:13,outline:'none',background:'var(--surface)'}}/>
                       </td>
                       <td style={{padding:'8px 4px',textAlign:'center'}}>
-                        <select value={newRow.dph_sazba} onChange={e => setNewRow(p=>({...p,dph_sazba:parseInt(e.target.value)}))} style={{width:'100%',border:'1px solid var(--border)',borderRadius:4,padding:'4px 2px',fontSize:11,background:'var(--surface)',outline:'none',textAlign:'center'}}>
-                          {DPH_SAZBY.map(s => <option key={s} value={s}>{s}%</option>)}
-                        </select>
+                        <span onClick={() => setNewRow(p=>({...p,dph_sazba:nextIn(DPH_SAZBY,p.dph_sazba)}))} title="Klikni pro změnu" style={{cursor:'pointer',fontSize:12,fontWeight:500,color:'var(--text-secondary)',display:'inline-block',padding:'2px 6px',borderRadius:4,border:'1px solid var(--border)',background:'var(--surface)'}}>
+                          {newRow.dph_sazba} %
+                        </span>
                       </td>
                       <td style={{padding:'8px 8px',textAlign:'right',color:'var(--text-tertiary)',fontSize:13}}>
                         {newRow.ucet_bez_dph ? fmt(calcSDph(parseFloat(newRow.ucet_bez_dph)||0, newRow.dph_sazba)) : '—'}
