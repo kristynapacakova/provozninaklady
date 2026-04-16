@@ -4,22 +4,25 @@ import { supabase, type Naklad } from '@/lib/supabase'
 import Link from 'next/link'
 
 const CURRENT_YEAR = new Date().getFullYear()
+const multMap: Record<string, number> = { 'měsíčně':1,'kvartálně':1/3,'pololetně':1/6,'ročně':1/12,'jednorázově':1/12 }
+
 const KAT_COLORS: Record<string, string> = {
-  'mzdy': '#534AB7', 'provozní náklady': '#185FA5', 'software': '#0F6E56',
-  'občerstvení': '#854F0B', 'doprava': '#3B6D11', 'rezerva': '#6b6b67',
-  'vzdělávání': '#993556', 'benefity': '#993C1D', '': '#9b9b96'
+  'mzdy':'#6366f1','provozní náklady':'#3b82f6','software':'#10b981',
+  'občerstvení':'#f59e0b','doprava':'#22c55e','rezerva':'#94a3b8',
+  'vzdělávání':'#ec4899','benefity':'#f97316','ostatní':'#94a3b8'
 }
-const multMap: Record<string, number> = { 'měsíčně': 1, 'kvartálně': 1/3, 'pololetně': 1/6, 'ročně': 1/12, 'jednorázově': 1/12 }
 
 function fmt(v: number) {
-  return v.toLocaleString('cs-CZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' Kč'
+  return v.toLocaleString('cs-CZ',{minimumFractionDigits:0,maximumFractionDigits:0}) + ' Kč'
 }
+function monthlyAmt(r: Naklad) { return r.ucet_bez_dph * (multMap[r.pravidelnost||'měsíčně']??1) }
+function monthlyCl(r: Naklad) { return r.cl_bez_dph * (multMap[r.pravidelnost||'měsíčně']??1) }
 
-function monthlyAmount(r: Naklad) {
-  return r.ucet_bez_dph * (multMap[r.pravidelnost || 'měsíčně'] ?? 1)
-}
-function monthlyCl(r: Naklad) {
-  return r.cl_bez_dph * (multMap[r.pravidelnost || 'měsíčně'] ?? 1)
+const STAV_CFG: Record<string,{label:string;color:string;bg:string}> = {
+  ok:{label:'Souhlasí',color:'#16a34a',bg:'#f0fdf4'},
+  chybi:{label:'V CL chybí',color:'#dc2626',bg:'#fef2f2'},
+  rozdil:{label:'Rozdíl',color:'#d97706',bg:'#fffbeb'},
+  smazat:{label:'Smazat z CL',color:'#9333ea',bg:'#faf5ff'},
 }
 
 export default function Dashboard() {
@@ -29,178 +32,258 @@ export default function Dashboard() {
 
   useEffect(() => {
     supabase.from('naklady').select('*').eq('rok', CURRENT_YEAR).then(({ data }) => {
-      // Deduplicate by name — keep latest month entry per unique name
       const seen = new Map<string, Naklad>()
-      ;(data || []).sort((a, b) => b.mesic - a.mesic).forEach(r => {
-        if (!seen.has(r.nazev)) seen.set(r.nazev, r)
-      })
+      ;(data||[]).sort((a,b) => b.mesic - a.mesic).forEach(r => { if (!seen.has(r.nazev)) seen.set(r.nazev, r) })
       setRows(Array.from(seen.values()))
       setLoading(false)
     })
   }, [])
 
-  const filtered = rows.filter(r =>
-    !search || r.nazev.toLowerCase().includes(search.toLowerCase()) || (r.kategorie || '').toLowerCase().includes(search.toLowerCase())
+  const filtered = rows.filter(r => !search ||
+    r.nazev.toLowerCase().includes(search.toLowerCase()) ||
+    (r.kategorie||'').toLowerCase().includes(search.toLowerCase())
   )
 
-  const totalBurnRate = filtered.reduce((s, r) => s + monthlyAmount(r), 0)
-  const totalClMonthly = filtered.reduce((s, r) => s + monthlyCl(r), 0)
-  const clGap = totalBurnRate - totalClMonthly
+  const totalBurn = filtered.reduce((s,r) => s + monthlyAmt(r), 0)
+  const totalCl = filtered.reduce((s,r) => s + monthlyCl(r), 0)
+  const gap = totalBurn - totalCl
   const toClean = filtered.filter(r => r.stav === 'smazat' || r.stav === 'chybi').length
-  const totalSDph = filtered.reduce((s, r) => s + r.ucet_s_dph * (multMap[r.pravidelnost || 'měsíčně'] ?? 1), 0)
+  const totalSDph = filtered.reduce((s,r) => s + r.ucet_s_dph*(multMap[r.pravidelnost||'měsíčně']??1), 0)
 
-  // Group by category
-  const byKat = filtered.reduce((acc, r) => {
-    const k = r.kategorie || 'ostatní'
-    if (!acc[k]) acc[k] = { burn: 0, cl: 0, count: 0 }
-    acc[k].burn += monthlyAmount(r)
-    acc[k].cl += monthlyCl(r)
-    acc[k].count++
-    return acc
-  }, {} as Record<string, { burn: number; cl: number; count: number }>)
+  // Category breakdown
+  const byKat: Record<string,{burn:number;cl:number;count:number}> = {}
+  filtered.forEach(r => {
+    const k = r.kategorie||'ostatní'
+    if (!byKat[k]) byKat[k] = {burn:0,cl:0,count:0}
+    byKat[k].burn += monthlyAmt(r)
+    byKat[k].cl += monthlyCl(r)
+    byKat[k].count++
+  })
+  const katEntries = Object.entries(byKat).sort((a,b) => b[1].burn - a[1].burn)
+  const maxBurn = Math.max(...katEntries.map(([,v]) => v.burn), 1)
 
-  const katEntries = Object.entries(byKat).sort((a, b) => b[1].burn - a[1].burn)
-  const maxBurn = Math.max(...katEntries.map(([, v]) => v.burn), 1)
+  // Top 5
+  const top5 = [...filtered].sort((a,b) => monthlyAmt(b) - monthlyAmt(a)).slice(0, 5)
+  // Items needing attention
+  const attention = filtered.filter(r => r.stav === 'smazat' || r.stav === 'chybi' || r.stav === 'rozdil')
+
+  const gapColor = gap === 0 ? '#16a34a' : Math.abs(gap) > totalBurn * 0.1 ? '#dc2626' : '#d97706'
+  const gapBg = gap === 0 ? '#f0fdf4' : Math.abs(gap) > totalBurn * 0.1 ? '#fef2f2' : '#fffbeb'
+  const gapBorder = gap === 0 ? '#bbf7d0' : Math.abs(gap) > totalBurn * 0.1 ? '#fecaca' : '#fde68a'
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'var(--font)' }}>
+    <div style={{display:'flex',height:'100vh',overflow:'hidden',fontFamily:'"Inter",-apple-system,BlinkMacSystemFont,sans-serif',background:'#f8fafc'}}>
       {/* Sidebar */}
-      <aside style={{ width: 'var(--sidebar-width)', background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-        <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 28, height: 28, background: 'var(--accent)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <aside style={{width:'220px',background:'#ffffff',borderRight:'1px solid #e2e8f0',display:'flex',flexDirection:'column',flexShrink:0}}>
+        <div style={{padding:'22px 18px 14px',borderBottom:'1px solid #e2e8f0'}}>
+          <div style={{display:'flex',alignItems:'center',gap:9}}>
+            <div style={{width:30,height:30,background:'#1e293b',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center'}}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
             </div>
-            <span style={{ fontWeight: 600, fontSize: 13 }}>Provozní náklady</span>
+            <div>
+              <div style={{fontWeight:700,fontSize:13,color:'#0f172a',lineHeight:1.2}}>Provozní</div>
+              <div style={{fontWeight:700,fontSize:13,color:'#0f172a',lineHeight:1.2}}>náklady</div>
+            </div>
           </div>
         </div>
 
-        <nav style={{ padding: '12px 8px' }}>
-          <div style={{ padding: '6px 12px', borderRadius: 6, background: 'var(--bg)', marginBottom: 2 }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>📊 Dashboard</span>
-          </div>
-          <Link href="/" style={{ textDecoration: 'none', display: 'block' }}>
-            <div style={{ padding: '6px 12px', borderRadius: 6, marginBottom: 2 }}>
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>📋 Měsíční přehled</span>
-            </div>
-          </Link>
+        <nav style={{padding:'10px 10px'}}>
+          {[
+            {href:'/dashboard',label:'Dashboard',icon:'◈',active:true},
+            {href:'/',label:'Měsíční přehled',icon:'≡',active:false},
+          ].map(item => (
+            <Link key={item.href} href={item.href} style={{textDecoration:'none',display:'block',marginBottom:2}}>
+              <div style={{
+                display:'flex',alignItems:'center',gap:9,padding:'8px 12px',borderRadius:8,
+                background:item.active?'#f1f5f9':'transparent',
+                color:item.active?'#0f172a':'#64748b',
+                fontWeight:item.active?600:400,fontSize:13,
+              }}>
+                <span style={{fontSize:14,width:16,textAlign:'center'}}>{item.icon}</span>
+                {item.label}
+              </div>
+            </Link>
+          ))}
         </nav>
+
+        <div style={{marginTop:'auto',padding:'16px 18px',borderTop:'1px solid #e2e8f0'}}>
+          <div style={{fontSize:11,color:'#94a3b8',fontWeight:500}}>{CURRENT_YEAR} · Přehled</div>
+          <div style={{fontSize:12,color:'#64748b',marginTop:2}}>{filtered.length} položek</div>
+        </div>
       </aside>
 
-      {/* Main */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Main scroll area */}
+      <main style={{flex:1,overflowY:'auto',padding:'32px 36px'}}>
+
         {/* Header */}
-        <div style={{ padding: '20px 28px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 2 }}>Dashboard — {CURRENT_YEAR}</h1>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Efektivní měsíční náklady (časové rozlišení) · Zdroj: všechny měsíce roku</p>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:28}}>
+          <div>
+            <h1 style={{fontSize:24,fontWeight:700,color:'#0f172a',margin:0,letterSpacing:'-0.02em'}}>Dashboard</h1>
+            <p style={{fontSize:13,color:'#94a3b8',margin:'4px 0 0',fontWeight:400}}>Efektivní měsíční náklady · časové rozlišení · {CURRENT_YEAR}</p>
+          </div>
+          <div style={{position:'relative'}}>
+            <svg style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'#94a3b8'}} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Hledat položku…" style={{padding:'9px 14px 9px 32px',border:'1px solid #e2e8f0',borderRadius:10,fontSize:13,outline:'none',background:'#fff',width:220,color:'#0f172a'}}/>
+          </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
-          {loading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-tertiary)' }}>Načítám…</div>
-          ) : (
-            <>
-              {/* Hero metric cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 28 }}>
-                <div style={{ borderRadius: 10, padding: '20px 22px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Monthly Burn Rate</div>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>{fmt(totalBurnRate)}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>{fmt(totalSDph)} s DPH</div>
-                </div>
-                <div style={{ borderRadius: 10, padding: '20px 22px', background: '#E6F1FB', border: '1px solid #B5D4F4' }}>
-                  <div style={{ fontSize: 11, fontWeight: 500, color: '#185FA5', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>CL Plán / měsíc</div>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: '#0C447C', lineHeight: 1 }}>{fmt(totalClMonthly)}</div>
-                  <div style={{ fontSize: 12, color: '#185FA5', marginTop: 6 }}>bez DPH · Costlocker</div>
-                </div>
-                <div style={{ borderRadius: 10, padding: '20px 22px', background: clGap === 0 ? '#EAF3DE' : clGap > 0 ? '#FCEBEB' : '#FAEEDA', border: `1px solid ${clGap === 0 ? '#C0DD97' : clGap > 0 ? '#F7C1C1' : '#FAC775'}` }}>
-                  <div style={{ fontSize: 11, fontWeight: 500, color: clGap === 0 ? '#3B6D11' : clGap > 0 ? '#A32D2D' : '#854F0B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>CL Gap</div>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: clGap === 0 ? '#27500A' : clGap > 0 ? '#791F1F' : '#633806', lineHeight: 1 }}>
-                    {clGap > 0 ? '+' : ''}{fmt(clGap)}
-                  </div>
-                  <div style={{ fontSize: 12, color: clGap === 0 ? '#3B6D11' : clGap > 0 ? '#A32D2D' : '#854F0B', marginTop: 6 }}>
-                    {clGap > 0 ? 'účet > CL plán' : clGap < 0 ? 'CL plán > účet' : 'vše souhlasí'}
-                  </div>
-                </div>
-                <div style={{ borderRadius: 10, padding: '20px 22px', background: toClean > 0 ? '#FCEBEB' : '#EAF3DE', border: `1px solid ${toClean > 0 ? '#F7C1C1' : '#C0DD97'}` }}>
-                  <div style={{ fontSize: 11, fontWeight: 500, color: toClean > 0 ? '#A32D2D' : '#3B6D11', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Položky k vyčištění</div>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: toClean > 0 ? '#791F1F' : '#27500A', lineHeight: 1 }}>{toClean}</div>
-                  <div style={{ fontSize: 12, color: toClean > 0 ? '#A32D2D' : '#3B6D11', marginTop: 6 }}>chybí v CL / smazat z CL</div>
-                </div>
-              </div>
+        {loading ? (
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:300,color:'#94a3b8',fontSize:14}}>Načítám data…</div>
+        ) : (<>
 
-              {/* Search */}
-              <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
-                  <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Hledat položku nebo kategorii…" style={{ width: '100%', padding: '8px 10px 8px 32px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--surface)' }} />
-                </div>
-                <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{filtered.length} položek</span>
+          {/* Hero metric cards */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:16,marginBottom:28}}>
+            {/* Burn Rate */}
+            <div style={{background:'#fff',borderRadius:14,padding:'22px 24px',border:'1px solid #e2e8f0',boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+                <div style={{width:8,height:8,borderRadius:'50%',background:'#6366f1'}}/>
+                <span style={{fontSize:11,fontWeight:600,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.08em'}}>Monthly Burn Rate</span>
               </div>
+              <div style={{fontSize:26,fontWeight:700,color:'#0f172a',letterSpacing:'-0.02em',lineHeight:1}}>{fmt(totalBurn)}</div>
+              <div style={{fontSize:12,color:'#94a3b8',marginTop:8}}>{fmt(totalSDph)} s DPH</div>
+            </div>
+            {/* CL Plan */}
+            <div style={{background:'#fff',borderRadius:14,padding:'22px 24px',border:'1px solid #e2e8f0',boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+                <div style={{width:8,height:8,borderRadius:'50%',background:'#3b82f6'}}/>
+                <span style={{fontSize:11,fontWeight:600,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.08em'}}>CL Plán / měsíc</span>
+              </div>
+              <div style={{fontSize:26,fontWeight:700,color:'#0f172a',letterSpacing:'-0.02em',lineHeight:1}}>{fmt(totalCl)}</div>
+              <div style={{fontSize:12,color:'#94a3b8',marginTop:8}}>bez DPH · Costlocker</div>
+            </div>
+            {/* CL Gap */}
+            <div style={{background:gapBg,borderRadius:14,padding:'22px 24px',border:`1px solid ${gapBorder}`,boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+                <div style={{width:8,height:8,borderRadius:'50%',background:gapColor}}/>
+                <span style={{fontSize:11,fontWeight:600,color:gapColor,textTransform:'uppercase',letterSpacing:'0.08em',opacity:0.8}}>CL Gap</span>
+              </div>
+              <div style={{fontSize:26,fontWeight:700,color:gapColor,letterSpacing:'-0.02em',lineHeight:1}}>
+                {gap > 0 ? '+' : ''}{fmt(gap)}
+              </div>
+              <div style={{fontSize:12,color:gapColor,marginTop:8,opacity:0.8}}>
+                {gap === 0 ? 'Vše souhlasí' : gap > 0 ? 'Účet přesahuje CL plán' : 'CL plán přesahuje účet'}
+              </div>
+            </div>
+            {/* Attention */}
+            <div style={{background: toClean > 0 ? '#fef2f2' : '#f0fdf4',borderRadius:14,padding:'22px 24px',border:`1px solid ${toClean > 0 ? '#fecaca' : '#bbf7d0'}`,boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+                <div style={{width:8,height:8,borderRadius:'50%',background:toClean>0?'#dc2626':'#16a34a'}}/>
+                <span style={{fontSize:11,fontWeight:600,color:toClean>0?'#dc2626':'#16a34a',textTransform:'uppercase',letterSpacing:'0.08em',opacity:0.8}}>K vyčištění</span>
+              </div>
+              <div style={{fontSize:26,fontWeight:700,color:toClean>0?'#dc2626':'#16a34a',letterSpacing:'-0.02em',lineHeight:1}}>{toClean}</div>
+              <div style={{fontSize:12,color:toClean>0?'#dc2626':'#16a34a',marginTop:8,opacity:0.8}}>{toClean>0?'položek vyžaduje pozornost':'Vše v pořádku'}</div>
+            </div>
+          </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' }}>
-                {/* Category breakdown */}
-                <div style={{ background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
-                  <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 500 }}>Náklady dle kategorie</span>
-                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>měsíční průměr</span>
+          {/* Category breakdown */}
+          <div style={{background:'#fff',borderRadius:14,border:'1px solid #e2e8f0',boxShadow:'0 1px 3px rgba(0,0,0,0.04)',marginBottom:20,overflow:'hidden'}}>
+            <div style={{padding:'18px 24px',borderBottom:'1px solid #f1f5f9',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:600,color:'#0f172a'}}>Náklady dle kategorie</div>
+                <div style={{fontSize:12,color:'#94a3b8',marginTop:2}}>Měsíční průměr · podíl z celku</div>
+              </div>
+              <div style={{fontSize:12,color:'#94a3b8'}}>CL plán šedě</div>
+            </div>
+            <div style={{padding:'8px 0'}}>
+              {katEntries.map(([kat, vals]) => {
+                const pct = (vals.burn / maxBurn) * 100
+                const clPct = (vals.cl / maxBurn) * 100
+                const color = KAT_COLORS[kat] || '#94a3b8'
+                const share = totalBurn > 0 ? ((vals.burn / totalBurn) * 100).toFixed(0) : '0'
+                return (
+                  <div key={kat} style={{padding:'12px 24px',borderBottom:'1px solid #f8fafc'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <div style={{width:10,height:10,borderRadius:3,background:color,flexShrink:0}}/>
+                        <span style={{fontSize:13,fontWeight:500,color:'#1e293b',textTransform:'capitalize'}}>{kat}</span>
+                        <span style={{fontSize:11,color:'#94a3b8',background:'#f1f5f9',padding:'1px 7px',borderRadius:20}}>{share} %</span>
+                      </div>
+                      <div style={{display:'flex',gap:16,alignItems:'center'}}>
+                        <span style={{fontSize:13,fontWeight:600,color:'#0f172a'}}>{fmt(vals.burn)}</span>
+                        <span style={{fontSize:12,color:'#94a3b8',minWidth:90,textAlign:'right'}}>CL {fmt(vals.cl)}</span>
+                      </div>
+                    </div>
+                    <div style={{position:'relative',height:4,background:'#f1f5f9',borderRadius:4,overflow:'hidden'}}>
+                      <div style={{position:'absolute',left:0,top:0,height:'100%',width:`${clPct}%`,background:'#e2e8f0',borderRadius:4}}/>
+                      <div style={{position:'absolute',left:0,top:0,height:'100%',width:`${pct}%`,background:color,borderRadius:4,opacity:0.85}}/>
+                    </div>
                   </div>
-                  {katEntries.map(([kat, vals]) => {
-                    const pct = (vals.burn / maxBurn) * 100
-                    const clPct = (vals.cl / maxBurn) * 100
-                    const color = KAT_COLORS[kat] || '#9b9b96'
-                    return (
-                      <div key={kat} style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                          <span style={{ fontSize: 13, fontWeight: 500, color }}>{kat || 'ostatní'}</span>
-                          <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
-                            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{fmt(vals.burn)}</span>
-                            <span style={{ color: 'var(--text-tertiary)' }}>CL: {fmt(vals.cl)}</span>
-                          </div>
-                        </div>
-                        <div style={{ position: 'relative', height: 6, background: 'var(--bg)', borderRadius: 3, overflow: 'hidden' }}>
-                          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${pct}%`, background: color, opacity: 0.3, borderRadius: 3 }} />
-                          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${Math.min(clPct, pct)}%`, background: color, borderRadius: 3 }} />
+                )
+              })}
+              {katEntries.length === 0 && (
+                <div style={{padding:'32px 24px',textAlign:'center',color:'#94a3b8',fontSize:13}}>Žádná data</div>
+              )}
+            </div>
+          </div>
+
+          {/* Two bottom tables */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+            {/* Top 5 */}
+            <div style={{background:'#fff',borderRadius:14,border:'1px solid #e2e8f0',boxShadow:'0 1px 3px rgba(0,0,0,0.04)',overflow:'hidden'}}>
+              <div style={{padding:'18px 24px',borderBottom:'1px solid #f1f5f9'}}>
+                <div style={{fontSize:14,fontWeight:600,color:'#0f172a'}}>Top 5 největších nákladů</div>
+                <div style={{fontSize:12,color:'#94a3b8',marginTop:2}}>Měsíční průměr</div>
+              </div>
+              <div>
+                {top5.map((r, i) => {
+                  const amt = monthlyAmt(r)
+                  const pct = totalBurn > 0 ? (amt / totalBurn) * 100 : 0
+                  const color = KAT_COLORS[r.kategorie||'ostatní']||'#94a3b8'
+                  return (
+                    <div key={r.id} style={{padding:'12px 24px',borderBottom:i<4?'1px solid #f8fafc':'none',display:'flex',alignItems:'center',gap:14}}>
+                      <div style={{width:22,height:22,borderRadius:6,background:'#f1f5f9',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'#64748b',flexShrink:0}}>
+                        {i+1}
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:500,color:'#1e293b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.nazev}</div>
+                        <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
+                          <div style={{height:3,width:`${pct}%`,background:color,borderRadius:2,maxWidth:100,opacity:0.8}}/>
+                          <span style={{fontSize:11,color:'#94a3b8'}}>{pct.toFixed(0)} %</span>
                         </div>
                       </div>
-                    )
-                  })}
-                </div>
-
-                {/* Items needing attention */}
-                <div style={{ background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
-                  <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
-                    <span style={{ fontSize: 13, fontWeight: 500 }}>Vyžaduje pozornost</span>
-                  </div>
-                  {filtered.filter(r => r.stav !== 'ok').length === 0 ? (
-                    <div style={{ padding: '24px 18px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>✓ Vše v pořádku</div>
-                  ) : (
-                    filtered.filter(r => r.stav !== 'ok').map(r => (
-                      <div key={r.id} style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 500 }}>{r.nazev}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 1 }}>{r.kategorie || '—'}</div>
-                        </div>
-                        <StavBadge stav={r.stav} />
-                      </div>
-                    ))
-                  )}
-                </div>
+                      <div style={{fontSize:13,fontWeight:600,color:'#0f172a',flexShrink:0}}>{fmt(amt)}</div>
+                    </div>
+                  )
+                })}
+                {top5.length === 0 && <div style={{padding:'32px 24px',textAlign:'center',color:'#94a3b8',fontSize:13}}>Žádná data</div>}
               </div>
-            </>
-          )}
-        </div>
+            </div>
+
+            {/* Attention items */}
+            <div style={{background:'#fff',borderRadius:14,border:'1px solid #e2e8f0',boxShadow:'0 1px 3px rgba(0,0,0,0.04)',overflow:'hidden'}}>
+              <div style={{padding:'18px 24px',borderBottom:'1px solid #f1f5f9',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:600,color:'#0f172a'}}>Vyžaduje pozornost</div>
+                  <div style={{fontSize:12,color:'#94a3b8',marginTop:2}}>Chybí v CL · smazat · rozdíl</div>
+                </div>
+                {attention.length > 0 && <div style={{fontSize:12,fontWeight:600,color:'#dc2626',background:'#fef2f2',padding:'3px 10px',borderRadius:20}}>{attention.length}</div>}
+              </div>
+              <div style={{maxHeight:300,overflowY:'auto'}}>
+                {attention.length === 0 ? (
+                  <div style={{padding:'32px 24px',textAlign:'center',color:'#94a3b8',fontSize:13}}>
+                    <div style={{fontSize:22,marginBottom:8}}>✓</div>
+                    Vše v pořádku
+                  </div>
+                ) : attention.map((r, i) => {
+                  const cfg = STAV_CFG[r.stav]||{label:r.stav,color:'#94a3b8',bg:'#f8fafc'}
+                  return (
+                    <div key={r.id} style={{padding:'12px 24px',borderBottom:i<attention.length-1?'1px solid #f8fafc':'none',display:'flex',justifyContent:'space-between',alignItems:'center',gap:12}}>
+                      <div style={{minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:500,color:'#1e293b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.nazev}</div>
+                        <div style={{fontSize:11,color:'#94a3b8',marginTop:2}}>{r.kategorie||'—'}</div>
+                      </div>
+                      <span style={{fontSize:11,fontWeight:600,color:cfg.color,background:cfg.bg,padding:'3px 10px',borderRadius:20,flexShrink:0,whiteSpace:'nowrap'}}>
+                        {cfg.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+        </>)}
       </main>
     </div>
   )
-}
-
-function StavBadge({ stav }: { stav: string }) {
-  const cfg: Record<string, { label: string; color: string }> = {
-    ok: { label: '✓ Souhlasí', color: 'var(--green)' },
-    chybi: { label: '✗ V CL chybí', color: 'var(--red)' },
-    rozdil: { label: '△ Rozdíl', color: 'var(--amber)' },
-    smazat: { label: '✕ Smazat z CL', color: '#993556' },
-  }
-  const c = cfg[stav] || { label: stav, color: 'var(--text-tertiary)' }
-  return <span style={{ fontSize: 11, fontWeight: 500, color: c.color, whiteSpace: 'nowrap' }}>{c.label}</span>
 }
