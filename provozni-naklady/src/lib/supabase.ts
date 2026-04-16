@@ -17,7 +17,7 @@ export type Naklad = {
   dph_sazba: number
   pravidelnost: string
   kategorie: string
-  stav: 'ok' | 'chybi' | 'rozdil'
+  stav: 'ok' | 'chybi' | 'rozdil' | 'smazat'
   poznamka: string
   poradi: number
 }
