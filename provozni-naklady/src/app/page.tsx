@@ -5,7 +5,6 @@ import { supabase, type Naklad } from '@/lib/supabase'
 const MONTHS = ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec']
 const CURRENT_YEAR = new Date().getFullYear()
 const DPH_SAZBY = [0, 10, 12, 21]
-const PRAVIDELNOST = ['měsíčně', 'kvartálně', 'pololetně', 'ročně', 'jednorázově']
 
 function fmt(v: number) {
   return v.toLocaleString('cs-CZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' Kč'
@@ -16,6 +15,12 @@ function fmtDiff(d: number) {
 }
 function calcSDph(bezDph: number, sazba: number) {
   return Math.round(bezDph * (1 + sazba / 100))
+}
+function getStav(bezDph: number, cl: number): 'ok' | 'chybi' | 'rozdil' {
+  if (!cl || cl === 0) return 'chybi'
+  const diff = bezDph - cl
+  if (diff === 0) return 'ok'
+  return 'rozdil'
 }
 
 type EditingCell = { id: string; field: keyof Naklad } | null
@@ -35,11 +40,8 @@ export default function Home() {
   const load = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
-      .from('naklady')
-      .select('*')
-      .eq('mesic', mesic)
-      .eq('rok', rok)
-      .order('poradi')
+      .from('naklady').select('*')
+      .eq('mesic', mesic).eq('rok', rok).order('poradi')
     setRows(data || [])
     setLoading(false)
   }, [mesic, rok])
@@ -54,16 +56,17 @@ export default function Home() {
     const currentRow = rows.find(r => r.id === id)!
     let updates: Partial<Naklad> = { [field]: val }
 
+    // Přepočet s DPH při změně bez DPH nebo sazby
     if (field === 'ucet_bez_dph' || field === 'dph_sazba') {
       const sazba = field === 'dph_sazba' ? (val as number) : currentRow.dph_sazba
       const bezDph = field === 'ucet_bez_dph' ? (val as number) : currentRow.ucet_bez_dph
       updates.ucet_s_dph = calcSDph(bezDph, sazba)
     }
-    if (field === 'cl_bez_dph' || field === 'dph_sazba') {
-      const sazba = field === 'dph_sazba' ? (val as number) : currentRow.dph_sazba
-      const bezDph = field === 'cl_bez_dph' ? (val as number) : currentRow.cl_bez_dph
-      updates.cl_s_dph = calcSDph(bezDph, sazba)
-    }
+
+    // Automatický stav — počítá se z bez DPH vs CL
+    const newBezDph = field === 'ucet_bez_dph' ? (val as number) : currentRow.ucet_bez_dph
+    const newCl = field === 'cl_bez_dph' ? (val as number) : currentRow.cl_bez_dph
+    updates.stav = getStav(newBezDph, newCl)
 
     setRows(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r))
     await supabase.from('naklady').update(updates).eq('id', id)
@@ -78,7 +81,7 @@ export default function Home() {
       ucet_bez_dph: 0, cl_bez_dph: 0,
       ucet_s_dph: 0, cl_s_dph: 0,
       dph_sazba: 21, pravidelnost: 'měsíčně',
-      stav: 'ok', poznamka: '', poradi: maxPoradi
+      stav: 'chybi', poznamka: '', poradi: maxPoradi
     }).select().single()
     if (data) setRows(prev => [...prev, data])
     setNewRowName('')
@@ -102,10 +105,10 @@ export default function Home() {
   }
 
   const filtered = filter === 'vse' ? rows : rows.filter(r => r.stav === filter)
-  const totalBankEx = rows.reduce((s, r) => s + r.ucet_bez_dph, 0)
-  const totalClEx = rows.reduce((s, r) => s + r.cl_bez_dph, 0)
-  const totalBankVat = rows.reduce((s, r) => s + r.ucet_s_dph, 0)
-  const totalClVat = rows.reduce((s, r) => s + r.cl_s_dph, 0)
+  const totalBezDph = rows.reduce((s, r) => s + r.ucet_bez_dph, 0)
+  const totalSDph = rows.reduce((s, r) => s + r.ucet_s_dph, 0)
+  const totalCl = rows.reduce((s, r) => s + r.cl_bez_dph, 0)
+  const totalDiff = totalBezDph - totalCl
   const countOk = rows.filter(r => r.stav === 'ok').length
   const countChybi = rows.filter(r => r.stav === 'chybi').length
   const countRozdil = rows.filter(r => r.stav === 'rozdil').length
@@ -193,33 +196,31 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Summary cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, paddingBottom: 20 }}>
-            <SummaryCard label="Z účtu celkem" sub="bez DPH" value={fmt(totalBankEx)} />
-            <SummaryCard label="Costlocker celkem" sub="bez DPH" value={fmt(totalClEx)} />
-            <SummaryCard label="Rozdíl bez DPH" sub="účet vs. CL" value={fmtDiff(totalBankEx - totalClEx)} diff={totalBankEx - totalClEx} />
-            <SummaryCard label="Rozdíl s DPH" sub="účet vs. CL" value={fmtDiff(totalBankVat - totalClVat)} diff={totalBankVat - totalClVat} />
+            <SummaryCard label="Celkem bez DPH" sub="z účtu" value={fmt(totalBezDph)} />
+            <SummaryCard label="Celkem s DPH" sub="z účtu" value={fmt(totalSDph)} />
+            <SummaryCard label="Costlocker celkem" sub="bez DPH" value={fmt(totalCl)} />
+            <SummaryCard label="Rozdíl" sub="účet vs. CL (bez DPH)" value={fmtDiff(totalDiff)} diff={totalDiff} />
           </div>
         </div>
 
-        {/* Table */}
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', padding: '20px 28px' }}>
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-tertiary)' }}>Načítám…</div>
           ) : (
-            <div style={{ background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden', minWidth: 800 }}>
+            <div style={{ background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden', minWidth: 750 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)' }}>
                     {[
-                      { label: 'Název', w: '22%', align: 'left' },
+                      { label: 'Název', w: '24%', align: 'left' },
                       { label: 'Cena bez DPH', w: '12%', align: 'right' },
                       { label: 'DPH %', w: '7%', align: 'center' },
                       { label: 'Cena s DPH', w: '12%', align: 'right' },
                       { label: 'CL', w: '12%', align: 'right' },
                       { label: 'Rozdíl', w: '10%', align: 'right' },
-                      { label: 'Stav', w: '10%', align: 'left' },
-                      { label: 'Poznámka', w: '15%', align: 'left' },
+                      { label: 'Stav', w: '9%', align: 'left' },
+                      { label: 'Poznámka', w: '14%', align: 'left' },
                     ].map((col, i) => (
                       <th key={i} style={{
                         padding: '10px 10px', textAlign: col.align as 'left' | 'right' | 'center',
@@ -233,7 +234,8 @@ export default function Home() {
                 </thead>
                 <tbody>
                   {filtered.map((row, idx) => {
-                    const diffVat = row.ucet_s_dph - row.cl_s_dph
+                    const diff = row.ucet_bez_dph - row.cl_bez_dph
+                    const stav = row.stav
                     return (
                       <tr key={row.id} style={{
                         borderBottom: idx < filtered.length - 1 ? '1px solid var(--border)' : 'none',
@@ -272,26 +274,15 @@ export default function Home() {
                             {row.ucet_s_dph === 0 ? '—' : fmt(row.ucet_s_dph)}
                           </span>
                         </td>
-                        {/* CL (s DPH) */}
-                        <NumCell row={row} field="cl_s_dph" editingCell={editingCell} editValue={editValue} setEditValue={setEditValue} startEdit={startEdit} commitEdit={commitEdit} muted />
+                        {/* CL (bez DPH) */}
+                        <NumCell row={row} field="cl_bez_dph" editingCell={editingCell} editValue={editValue} setEditValue={setEditValue} startEdit={startEdit} commitEdit={commitEdit} muted />
                         {/* Rozdíl */}
-                        <td style={{ padding: '9px 10px', textAlign: 'right' }}><DiffBadge value={diffVat} /></td>
-                        {/* Stav */}
+                        <td style={{ padding: '9px 10px', textAlign: 'right' }}>
+                          <DiffBadge value={diff} clEmpty={!row.cl_bez_dph} />
+                        </td>
+                        {/* Stav — automatický, read-only */}
                         <td style={{ padding: '9px 10px' }}>
-                          <select
-                            value={row.stav}
-                            onChange={e => updateField(row.id, 'stav', e.target.value)}
-                            style={{
-                              border: 'none', background: 'transparent', fontSize: 12,
-                              fontFamily: 'var(--font)', cursor: 'pointer', outline: 'none',
-                              color: row.stav === 'ok' ? 'var(--green)' : row.stav === 'chybi' ? 'var(--red)' : 'var(--amber)',
-                              fontWeight: 500
-                            }}
-                          >
-                            <option value="ok">✓ Souhlasí</option>
-                            <option value="chybi">✗ V CL chybí</option>
-                            <option value="rozdil">△ Rozdíl</option>
-                          </select>
+                          <StavBadge stav={stav} />
                         </td>
                         {/* Poznámka */}
                         <td style={{ padding: '9px 10px' }}>
@@ -324,17 +315,16 @@ export default function Home() {
                   })}
                   {filtered.length === 0 && !addingRow && (
                     <tr>
-                      <td colSpan={11} style={{ padding: '40px 12px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+                      <td colSpan={9} style={{ padding: '40px 12px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
                         Žádné položky. Přidej první kliknutím na „Přidat položku".
                       </td>
                     </tr>
                   )}
                   {addingRow && (
                     <tr style={{ borderTop: '1px solid var(--border)' }}>
-                      <td colSpan={11} style={{ padding: '10px 12px' }}>
+                      <td colSpan={9} style={{ padding: '10px 12px' }}>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <input
-                            autoFocus value={newRowName}
+                          <input autoFocus value={newRowName}
                             onChange={e => setNewRowName(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter') addRow(); if (e.key === 'Escape') setAddingRow(false) }}
                             placeholder="Název položky…"
@@ -368,13 +358,13 @@ function SummaryCard({ label, sub, value, diff }: { label: string; sub: string; 
   )
 }
 
-function DiffBadge({ value }: { value: number }) {
-  if (value === 0) return <span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>—</span>
+function DiffBadge({ value, clEmpty }: { value: number; clEmpty: boolean }) {
+  if (clEmpty) return <span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>—</span>
+  if (value === 0) return <span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>0 Kč</span>
   const pos = value > 0
   return (
     <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      fontSize: 12, fontWeight: 500,
+      display: 'inline-flex', alignItems: 'center', fontSize: 12, fontWeight: 500,
       color: pos ? 'var(--red)' : 'var(--green)',
       background: pos ? 'var(--red-bg)' : 'var(--green-bg)',
       padding: '2px 7px', borderRadius: 5
@@ -382,6 +372,15 @@ function DiffBadge({ value }: { value: number }) {
       {pos ? '+' : ''}{value.toLocaleString('cs-CZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} Kč
     </span>
   )
+}
+
+function StavBadge({ stav }: { stav: string }) {
+  const cfg = {
+    ok: { label: '✓ Souhlasí', color: 'var(--green)' },
+    chybi: { label: '✗ V CL chybí', color: 'var(--red)' },
+    rozdil: { label: '△ Rozdíl', color: 'var(--amber)' },
+  }[stav] || { label: stav, color: 'var(--text-tertiary)' }
+  return <span style={{ fontSize: 12, fontWeight: 500, color: cfg.color }}>{cfg.label}</span>
 }
 
 function NumCell({ row, field, editingCell, editValue, setEditValue, startEdit, commitEdit, muted }: {
