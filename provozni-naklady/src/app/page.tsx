@@ -1,11 +1,12 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase, type Naklad } from '@/lib/supabase'
 
 const MONTHS = ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec']
 const CURRENT_YEAR = new Date().getFullYear()
 const DPH_SAZBY = [0, 10, 12, 21]
 const PRAVIDELNOST = ['měsíčně','kvartálně','pololetně','ročně','jednorázově']
+const KATEGORIE = ['—','mzdy','provozní náklady','software','občerstvení','doprava','rezerva','vzdělávání','benefity']
 
 function fmt(v: number) {
   return v.toLocaleString('cs-CZ', {minimumFractionDigits:0,maximumFractionDigits:0}) + ' Kč'
@@ -23,7 +24,7 @@ function getStav(bezDph: number, cl: number): 'ok' | 'chybi' | 'rozdil' {
 }
 
 type EditingCell = { id: string; field: keyof Naklad } | null
-type NewRow = { nazev: string; ucet_bez_dph: string; dph_sazba: number; cl_bez_dph: string; pravidelnost: string; poznamka: string }
+type NewRow = { nazev: string; ucet_bez_dph: string; dph_sazba: number; cl_bez_dph: string; pravidelnost: string; kategorie: string; poznamka: string }
 
 export default function Home() {
   const [mesic, setMesic] = useState(new Date().getMonth() + 1)
@@ -35,9 +36,11 @@ export default function Home() {
   const [editValue, setEditValue] = useState('')
   const [filter, setFilter] = useState<'vse'|'ok'|'chybi'|'rozdil'>('vse')
   const [addingRow, setAddingRow] = useState(false)
-  const [newRow, setNewRow] = useState<NewRow>({ nazev:'', ucet_bez_dph:'', dph_sazba:21, cl_bez_dph:'', pravidelnost:'měsíčně', poznamka:'' })
+  const [newRow, setNewRow] = useState<NewRow>({ nazev:'', ucet_bez_dph:'', dph_sazba:21, cl_bez_dph:'', pravidelnost:'měsíčně', kategorie:'—', poznamka:'' })
   const [copying, setCopying] = useState(false)
   const [copyMsg, setCopyMsg] = useState('')
+  const dragId = useRef<string|null>(null)
+  const dragOverId = useRef<string|null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -77,10 +80,11 @@ export default function Home() {
       ucet_bez_dph: bezDph, cl_bez_dph: cl,
       ucet_s_dph: calcSDph(bezDph, newRow.dph_sazba), cl_s_dph: 0,
       dph_sazba: newRow.dph_sazba, pravidelnost: newRow.pravidelnost,
+      kategorie: newRow.kategorie === '—' ? '' : newRow.kategorie,
       stav: getStav(bezDph, cl), poznamka: newRow.poznamka, poradi: maxPoradi
     }).select().single()
     if (data) setRows(prev => [...prev, data])
-    setNewRow({ nazev:'', ucet_bez_dph:'', dph_sazba:21, cl_bez_dph:'', pravidelnost:'měsíčně', poznamka:'' })
+    setNewRow({ nazev:'', ucet_bez_dph:'', dph_sazba:21, cl_bez_dph:'', pravidelnost:'měsíčně', kategorie:'—', poznamka:'' })
     setAddingRow(false)
   }
 
@@ -99,12 +103,35 @@ export default function Home() {
     setEditingCell(null)
   }
 
+  // Drag & drop
+  function onDragStart(id: string) { dragId.current = id }
+  function onDragOver(e: React.DragEvent, id: string) {
+    e.preventDefault()
+    dragOverId.current = id
+  }
+  async function onDrop() {
+    const fromId = dragId.current
+    const toId = dragOverId.current
+    if (!fromId || !toId || fromId === toId) return
+    const newRows = [...rows]
+    const fromIdx = newRows.findIndex(r => r.id === fromId)
+    const toIdx = newRows.findIndex(r => r.id === toId)
+    const [moved] = newRows.splice(fromIdx, 1)
+    newRows.splice(toIdx, 0, moved)
+    const updated = newRows.map((r, i) => ({ ...r, poradi: i + 1 }))
+    setRows(updated)
+    dragId.current = null
+    dragOverId.current = null
+    // Persist order
+    await Promise.all(updated.map(r => supabase.from('naklady').update({ poradi: r.poradi }).eq('id', r.id)))
+  }
+
   async function copyToMonth(targetMesic: number) {
     if (rows.length === 0) return
     setCopying(true)
     const { data: existing } = await supabase.from('naklady').select('id').eq('mesic', targetMesic).eq('rok', rok)
     if (existing && existing.length > 0) {
-      setCopyMsg(`${MONTHS[targetMesic-1]} už má ${existing.length} položek — přejdi tam ručně a uprav je.`)
+      setCopyMsg(`${MONTHS[targetMesic-1]} už má ${existing.length} položek.`)
       setCopying(false)
       setTimeout(() => setCopyMsg(''), 4000)
       return
@@ -114,6 +141,7 @@ export default function Home() {
       ucet_bez_dph: r.ucet_bez_dph, cl_bez_dph: r.cl_bez_dph,
       ucet_s_dph: r.ucet_s_dph, cl_s_dph: r.cl_s_dph,
       dph_sazba: r.dph_sazba, pravidelnost: r.pravidelnost,
+      kategorie: r.kategorie || '',
       stav: r.stav, poznamka: r.poznamka, poradi: i + 1
     }))
     await supabase.from('naklady').insert(toInsert)
@@ -127,15 +155,11 @@ export default function Home() {
   const totalSDph = rows.reduce((s,r) => s + r.ucet_s_dph, 0)
   const totalCl = rows.reduce((s,r) => s + r.cl_bez_dph, 0)
   const totalDiff = totalBezDph - totalCl
-  const totalDiffSDph = totalSDph - totalCl
-
-  // Roční součty — měsíční * 12, kvartální * 4, pololetní * 2, roční * 1, jednorázové * 1
-  const multMap: Record<string, number> = { 'měsíčně': 12, 'kvartálně': 4, 'pololetně': 2, 'ročně': 1, 'jednorázově': 1 }
-  const totalRocneBezDph = rows.reduce((s,r) => s + r.ucet_bez_dph * (multMap[r.pravidelnost||'měsíčně']||12), 0)
-  const totalRocneSDph = rows.reduce((s,r) => s + r.ucet_s_dph * (multMap[r.pravidelnost||'měsíčně']||12), 0)
-  const totalRocneCl = rows.reduce((s,r) => s + r.cl_bez_dph * (multMap[r.pravidelnost||'měsíčně']||12), 0)
+  const multMap: Record<string, number> = { 'měsíčně':12,'kvartálně':4,'pololetně':2,'ročně':1,'jednorázově':1 }
+  const totalRocneBezDph = rows.reduce((s,r) => s + r.ucet_bez_dph*(multMap[r.pravidelnost||'měsíčně']||12), 0)
+  const totalRocneSDph = rows.reduce((s,r) => s + r.ucet_s_dph*(multMap[r.pravidelnost||'měsíčně']||12), 0)
+  const totalRocneCl = rows.reduce((s,r) => s + r.cl_bez_dph*(multMap[r.pravidelnost||'měsíčně']||12), 0)
   const totalRocneDiff = totalRocneBezDph - totalRocneCl
-
   const countOk = rows.filter(r => r.stav === 'ok').length
   const countChybi = rows.filter(r => r.stav === 'chybi').length
   const countRozdil = rows.filter(r => r.stav === 'rozdil').length
@@ -192,7 +216,6 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Kopírovat do jiného měsíce */}
         <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)'}}>
           <div style={{fontSize:11,fontWeight:500,color:'var(--text-tertiary)',letterSpacing:'0.06em',textTransform:'uppercase',marginBottom:8}}>Kopírovat do měsíce</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
@@ -224,21 +247,17 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Summary cards */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:10,paddingBottom:20}}>
-            {/* Náklady měsíčně bez DPH */}
             <div style={{borderRadius:8,padding:'12px 14px',background:'var(--surface)',border:'1px solid var(--border)'}}>
               <div style={{fontSize:10,color:'var(--text-tertiary)',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>Náklady / měsíc</div>
               <div style={{fontSize:17,fontWeight:600,color:'var(--text-primary)'}}>{fmt(totalBezDph)}</div>
               <div style={{fontSize:11,color:'var(--text-tertiary)',marginTop:2}}>{fmt(totalSDph)} s DPH</div>
             </div>
-            {/* Náklady ročně */}
             <div style={{borderRadius:8,padding:'12px 14px',background:'var(--surface)',border:'1px solid var(--border)'}}>
               <div style={{fontSize:10,color:'var(--text-tertiary)',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>Náklady / rok</div>
               <div style={{fontSize:17,fontWeight:600,color:'var(--text-primary)'}}>{fmt(totalRocneBezDph)}</div>
               <div style={{fontSize:11,color:'var(--text-tertiary)',marginTop:2}}>{fmt(totalRocneSDph)} s DPH</div>
             </div>
-            {/* Oddělovač */}
             <div style={{borderRadius:8,padding:'12px 14px',background:'#E6F1FB',border:'1px solid #B5D4F4'}}>
               <div style={{fontSize:10,color:'#185FA5',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>CL / měsíc</div>
               <div style={{fontSize:17,fontWeight:600,color:'#0C447C'}}>{fmt(totalCl)}</div>
@@ -249,13 +268,11 @@ export default function Home() {
               <div style={{fontSize:17,fontWeight:600,color:'#0C447C'}}>{fmt(totalRocneCl)}</div>
               <div style={{fontSize:11,color:'#185FA5',marginTop:2}}>bez DPH</div>
             </div>
-            {/* Rozdíl měsíčně */}
             <div style={{borderRadius:8,padding:'12px 14px',background:'#FAEEDA',border:'1px solid #FAC775'}}>
               <div style={{fontSize:10,color:'#854F0B',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>Rozdíl / měsíc</div>
               <div style={{fontSize:17,fontWeight:600,color:'#633806'}}>{fmtDiff(totalDiff)}</div>
               <div style={{fontSize:11,color:'#854F0B',marginTop:2}}>účet vs. CL</div>
             </div>
-            {/* Rozdíl ročně */}
             <div style={{borderRadius:8,padding:'12px 14px',background:'#FAEEDA',border:'1px solid #FAC775'}}>
               <div style={{fontSize:10,color:'#854F0B',fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>Rozdíl / rok</div>
               <div style={{fontSize:17,fontWeight:600,color:'#633806'}}>{fmtDiff(totalRocneDiff)}</div>
@@ -264,29 +281,32 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Table */}
         <div style={{flex:1,overflowY:'auto',overflowX:'auto',padding:'20px 28px'}}>
           {loading ? (
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:200,color:'var(--text-tertiary)'}}>Načítám…</div>
           ) : (
-            <div style={{background:'var(--surface)',borderRadius:10,border:'1px solid var(--border)',overflow:'hidden',minWidth:900}}>
+            <div style={{background:'var(--surface)',borderRadius:10,border:'1px solid var(--border)',overflow:'hidden',minWidth:1050}}>
               <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
                 <colgroup>
-                  <col style={{width:'18%'}}/>
-                  <col style={{width:'10%'}}/>
-                  <col style={{width:'10%'}}/>
-                  <col style={{width:'6%'}}/>
-                  <col style={{width:'10%'}}/>
-                  <col style={{width:'10%'}}/>
-                  <col style={{width:'9%'}}/>
-                  <col style={{width:'9%'}}/>
+                  <col style={{width:'28px'}}/>{/* drag handle */}
                   <col style={{width:'14%'}}/>
-                  <col style={{width:'4%'}}/>
+                  <col style={{width:'9%'}}/>
+                  <col style={{width:'9%'}}/>
+                  <col style={{width:'9%'}}/>
+                  <col style={{width:'6%'}}/>
+                  <col style={{width:'9%'}}/>
+                  <col style={{width:'9%'}}/>
+                  <col style={{width:'8%'}}/>
+                  <col style={{width:'8%'}}/>
+                  <col style={{width:'11%'}}/>
+                  <col style={{width:'28px'}}/>{/* delete */}
                 </colgroup>
                 <thead>
                   <tr style={{borderBottom:'1px solid var(--border)',background:'#fafaf8'}}>
+                    <th style={{width:28}}/>
                     {[
                       {label:'Název',align:'left'},
+                      {label:'Kategorie',align:'left'},
                       {label:'Pravidelnost',align:'left'},
                       {label:'Cena bez DPH',align:'right'},
                       {label:'DPH %',align:'center'},
@@ -295,53 +315,75 @@ export default function Home() {
                       {label:'Rozdíl',align:'right'},
                       {label:'Stav',align:'left'},
                       {label:'Poznámka',align:'left'},
-                      {label:'',align:'left'},
                     ].map((col,i) => (
-                      <th key={i} style={{padding:'10px 10px',textAlign:col.align as 'left'|'right'|'center',fontSize:11,fontWeight:500,color:'var(--text-tertiary)',letterSpacing:'0.05em',textTransform:'uppercase',whiteSpace:'nowrap',overflow:'hidden'}}>{col.label}</th>
+                      <th key={i} style={{padding:'10px 8px',textAlign:col.align as 'left'|'right'|'center',fontSize:11,fontWeight:500,color:'var(--text-tertiary)',letterSpacing:'0.05em',textTransform:'uppercase',whiteSpace:'nowrap',overflow:'hidden'}}>{col.label}</th>
                     ))}
+                    <th style={{width:28}}/>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((row,idx) => {
                     const diff = row.ucet_bez_dph - row.cl_bez_dph
                     return (
-                      <tr key={row.id} style={{borderBottom:idx<filtered.length-1?'1px solid var(--border)':'none',background:saving===row.id?'#fafaf8':undefined}}>
-                        <td style={{padding:'9px 10px',overflow:'hidden'}}>
+                      <tr key={row.id}
+                        draggable
+                        onDragStart={() => onDragStart(row.id)}
+                        onDragOver={e => onDragOver(e, row.id)}
+                        onDrop={onDrop}
+                        style={{borderBottom:idx<filtered.length-1?'1px solid var(--border)':'none',background:saving===row.id?'#fafaf8':undefined,cursor:'default'}}
+                      >
+                        {/* Drag handle */}
+                        <td style={{padding:'9px 4px',textAlign:'center',color:'var(--text-tertiary)',cursor:'grab',userSelect:'none',fontSize:14}}>⠿</td>
+                        {/* Název */}
+                        <td style={{padding:'9px 8px',overflow:'hidden'}}>
                           <EditCell isEditing={editingCell?.id===row.id&&editingCell.field==='nazev'} value={editValue} display={row.nazev||'—'} onChange={setEditValue} onStart={() => startEdit(row.id,'nazev',row.nazev)} onCommit={commitEdit}/>
                         </td>
-                        <td style={{padding:'9px 10px'}}>
+                        {/* Kategorie */}
+                        <td style={{padding:'9px 8px'}}>
+                          <select value={row.kategorie||'—'} onChange={e => updateField(row.id,'kategorie',e.target.value==='—'?'':e.target.value)} style={{border:'none',background:'transparent',fontSize:12,fontFamily:'var(--font)',cursor:'pointer',outline:'none',color:'var(--text-secondary)',width:'100%'}}>
+                            {KATEGORIE.map(k => <option key={k} value={k}>{k}</option>)}
+                          </select>
+                        </td>
+                        {/* Pravidelnost */}
+                        <td style={{padding:'9px 8px'}}>
                           <select value={row.pravidelnost||'měsíčně'} onChange={e => updateField(row.id,'pravidelnost',e.target.value)} style={{border:'none',background:'transparent',fontSize:12,fontFamily:'var(--font)',cursor:'pointer',outline:'none',color:'var(--text-secondary)',width:'100%'}}>
                             {PRAVIDELNOST.map(p => <option key={p} value={p}>{p}</option>)}
                           </select>
                         </td>
+                        {/* Cena bez DPH */}
                         <NumCell row={row} field="ucet_bez_dph" editingCell={editingCell} editValue={editValue} setEditValue={setEditValue} startEdit={startEdit} commitEdit={commitEdit}/>
-                        <td style={{padding:'9px 6px',textAlign:'center'}}>
-                          <select value={row.dph_sazba??21} onChange={e => updateField(row.id,'dph_sazba',e.target.value)} style={{border:'1px solid var(--border)',background:'var(--bg)',borderRadius:5,fontSize:12,fontFamily:'var(--font)',cursor:'pointer',outline:'none',padding:'2px 2px',color:'var(--text-primary)',fontWeight:500,width:'100%',textAlign:'center'}}>
-                            {DPH_SAZBY.map(s => <option key={s} value={s}>{s} %</option>)}
+                        {/* DPH % */}
+                        <td style={{padding:'9px 4px',textAlign:'center'}}>
+                          <select value={row.dph_sazba??21} onChange={e => updateField(row.id,'dph_sazba',e.target.value)} style={{border:'1px solid var(--border)',background:'var(--bg)',borderRadius:5,fontSize:11,fontFamily:'var(--font)',cursor:'pointer',outline:'none',padding:'2px 2px',color:'var(--text-primary)',fontWeight:500,width:'100%',textAlign:'center'}}>
+                            {DPH_SAZBY.map(s => <option key={s} value={s}>{s}%</option>)}
                           </select>
                         </td>
-                        <td style={{padding:'9px 10px',textAlign:'right'}}>
+                        {/* Cena s DPH */}
+                        <td style={{padding:'9px 8px',textAlign:'right'}}>
                           <span style={{fontSize:13,fontWeight:500,color:row.ucet_s_dph===0?'var(--text-tertiary)':'var(--text-primary)'}}>
                             {row.ucet_s_dph===0?'—':fmt(row.ucet_s_dph)}
                           </span>
                         </td>
+                        {/* CL */}
                         <NumCell row={row} field="cl_bez_dph" editingCell={editingCell} editValue={editValue} setEditValue={setEditValue} startEdit={startEdit} commitEdit={commitEdit} muted/>
-                        <td style={{padding:'9px 10px',textAlign:'right'}}>
+                        {/* Rozdíl */}
+                        <td style={{padding:'9px 8px',textAlign:'right'}}>
                           {row.cl_bez_dph===0
                             ? <span style={{color:'var(--text-tertiary)',fontSize:13}}>—</span>
-                            : <span style={{display:'inline-flex',alignItems:'center',fontSize:12,fontWeight:500,color:diff>0?'var(--red)':diff<0?'var(--green)':'var(--text-tertiary)',background:diff>0?'var(--red-bg)':diff<0?'var(--green-bg)':'transparent',padding:diff!==0?'2px 7px':'0',borderRadius:5}}>
+                            : <span style={{display:'inline-flex',alignItems:'center',fontSize:12,fontWeight:500,color:diff>0?'var(--red)':diff<0?'var(--green)':'var(--text-tertiary)',background:diff>0?'var(--red-bg)':diff<0?'var(--green-bg)':'transparent',padding:diff!==0?'2px 6px':'0',borderRadius:5}}>
                                 {diff===0?'0 Kč':(diff>0?'+':'')+diff.toLocaleString('cs-CZ',{minimumFractionDigits:0,maximumFractionDigits:0})+' Kč'}
                               </span>
                           }
                         </td>
-                        <td style={{padding:'9px 10px'}}>
-                          <StavBadge stav={row.stav}/>
-                        </td>
-                        <td style={{padding:'9px 10px',overflow:'hidden'}}>
+                        {/* Stav */}
+                        <td style={{padding:'9px 8px'}}><StavBadge stav={row.stav}/></td>
+                        {/* Poznámka */}
+                        <td style={{padding:'9px 8px',overflow:'hidden'}}>
                           <EditCell isEditing={editingCell?.id===row.id&&editingCell.field==='poznamka'} value={editValue} display={row.poznamka||<span style={{color:'var(--text-tertiary)'}}>—</span>} onChange={setEditValue} onStart={() => startEdit(row.id,'poznamka',row.poznamka)} onCommit={commitEdit}/>
                         </td>
-                        <td style={{padding:'9px 6px',textAlign:'center'}}>
-                          <button onClick={() => deleteRow(row.id)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-tertiary)',padding:4,borderRadius:4,opacity:0.5}} onMouseEnter={e=>(e.currentTarget.style.opacity='1')} onMouseLeave={e=>(e.currentTarget.style.opacity='0.5')}>
+                        {/* Delete */}
+                        <td style={{padding:'9px 4px',textAlign:'center'}}>
+                          <button onClick={() => deleteRow(row.id)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-tertiary)',padding:4,borderRadius:4,opacity:0.4}} onMouseEnter={e=>(e.currentTarget.style.opacity='1')} onMouseLeave={e=>(e.currentTarget.style.opacity='0.4')}>
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                           </button>
                         </td>
@@ -349,45 +391,50 @@ export default function Home() {
                     )
                   })}
 
-                  {/* Inline přidání nové položky */}
+                  {/* Inline přidání */}
                   {addingRow && (
                     <tr style={{borderTop:'2px solid var(--border-strong)',background:'var(--bg)'}}>
-                      <td style={{padding:'8px 10px'}}>
+                      <td/>
+                      <td style={{padding:'8px 8px'}}>
                         <input autoFocus value={newRow.nazev} onChange={e => setNewRow(p=>({...p,nazev:e.target.value}))} onKeyDown={e=>{if(e.key==='Enter')addRow();if(e.key==='Escape')setAddingRow(false)}} placeholder="Název…" style={{width:'100%',border:'1px solid var(--border-strong)',borderRadius:4,padding:'4px 6px',fontSize:13,outline:'none',background:'var(--surface)'}}/>
+                      </td>
+                      <td style={{padding:'8px 6px'}}>
+                        <select value={newRow.kategorie} onChange={e => setNewRow(p=>({...p,kategorie:e.target.value}))} style={{width:'100%',border:'1px solid var(--border)',borderRadius:4,padding:'4px 4px',fontSize:12,background:'var(--surface)',outline:'none',color:'var(--text-secondary)'}}>
+                          {KATEGORIE.map(k => <option key={k} value={k}>{k}</option>)}
+                        </select>
                       </td>
                       <td style={{padding:'8px 6px'}}>
                         <select value={newRow.pravidelnost} onChange={e => setNewRow(p=>({...p,pravidelnost:e.target.value}))} style={{width:'100%',border:'1px solid var(--border)',borderRadius:4,padding:'4px 4px',fontSize:12,background:'var(--surface)',outline:'none',color:'var(--text-secondary)'}}>
                           {PRAVIDELNOST.map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                       </td>
-                      <td style={{padding:'8px 10px'}}>
+                      <td style={{padding:'8px 8px'}}>
                         <input type="number" value={newRow.ucet_bez_dph} onChange={e => setNewRow(p=>({...p,ucet_bez_dph:e.target.value}))} placeholder="0" style={{width:'100%',textAlign:'right',border:'1px solid var(--border)',borderRadius:4,padding:'4px 6px',fontSize:13,outline:'none',background:'var(--surface)'}}/>
                       </td>
                       <td style={{padding:'8px 4px',textAlign:'center'}}>
-                        <select value={newRow.dph_sazba} onChange={e => setNewRow(p=>({...p,dph_sazba:parseInt(e.target.value)}))} style={{width:'100%',border:'1px solid var(--border)',borderRadius:4,padding:'4px 2px',fontSize:12,background:'var(--surface)',outline:'none',textAlign:'center'}}>
-                          {DPH_SAZBY.map(s => <option key={s} value={s}>{s} %</option>)}
+                        <select value={newRow.dph_sazba} onChange={e => setNewRow(p=>({...p,dph_sazba:parseInt(e.target.value)}))} style={{width:'100%',border:'1px solid var(--border)',borderRadius:4,padding:'4px 2px',fontSize:11,background:'var(--surface)',outline:'none',textAlign:'center'}}>
+                          {DPH_SAZBY.map(s => <option key={s} value={s}>{s}%</option>)}
                         </select>
                       </td>
-                      <td style={{padding:'8px 10px',textAlign:'right',color:'var(--text-tertiary)',fontSize:13}}>
+                      <td style={{padding:'8px 8px',textAlign:'right',color:'var(--text-tertiary)',fontSize:13}}>
                         {newRow.ucet_bez_dph ? fmt(calcSDph(parseFloat(newRow.ucet_bez_dph)||0, newRow.dph_sazba)) : '—'}
                       </td>
-                      <td style={{padding:'8px 10px'}}>
+                      <td style={{padding:'8px 8px'}}>
                         <input type="number" value={newRow.cl_bez_dph} onChange={e => setNewRow(p=>({...p,cl_bez_dph:e.target.value}))} placeholder="0" style={{width:'100%',textAlign:'right',border:'1px solid var(--border)',borderRadius:4,padding:'4px 6px',fontSize:13,outline:'none',background:'var(--surface)'}}/>
                       </td>
-                      <td colSpan={2} style={{padding:'8px 10px',fontSize:12,color:'var(--text-tertiary)'}}>
-                        stav se nastaví automaticky
-                      </td>
-                      <td style={{padding:'8px 10px'}}>
+                      <td style={{padding:'8px 8px',fontSize:12,color:'var(--text-tertiary)',textAlign:'center'}}>auto</td>
+                      <td style={{padding:'8px 8px',fontSize:12,color:'var(--text-tertiary)',textAlign:'center'}}>auto</td>
+                      <td style={{padding:'8px 8px'}}>
                         <input type="text" value={newRow.poznamka} onChange={e => setNewRow(p=>({...p,poznamka:e.target.value}))} placeholder="Poznámka…" style={{width:'100%',border:'1px solid var(--border)',borderRadius:4,padding:'4px 6px',fontSize:13,outline:'none',background:'var(--surface)'}}/>
                       </td>
-                      <td style={{padding:'8px 6px',textAlign:'center'}}>
-                        <button onClick={addRow} style={{background:'var(--accent)',border:'none',color:'white',borderRadius:5,padding:'5px 8px',cursor:'pointer',fontSize:12,fontWeight:500}}>✓</button>
+                      <td style={{padding:'8px 4px',textAlign:'center'}}>
+                        <button onClick={addRow} style={{background:'var(--accent)',border:'none',color:'white',borderRadius:5,padding:'5px 8px',cursor:'pointer',fontSize:13,fontWeight:500}}>✓</button>
                       </td>
                     </tr>
                   )}
 
                   {filtered.length===0&&!addingRow&&(
-                    <tr><td colSpan={10} style={{padding:'40px',textAlign:'center',color:'var(--text-tertiary)'}}>Žádné položky. Přidej první kliknutím na „Přidat položku".</td></tr>
+                    <tr><td colSpan={12} style={{padding:'40px',textAlign:'center',color:'var(--text-tertiary)'}}>Žádné položky. Přidej první kliknutím na „Přidat položku".</td></tr>
                   )}
                 </tbody>
               </table>
@@ -406,7 +453,7 @@ function StavBadge({stav}:{stav:string}) {
     rozdil:{label:'△ Rozdíl',color:'var(--amber)'},
   }
   const c = cfg[stav]||{label:stav,color:'var(--text-tertiary)'}
-  return <span style={{fontSize:12,fontWeight:500,color:c.color}}>{c.label}</span>
+  return <span style={{fontSize:12,fontWeight:500,color:c.color,whiteSpace:'nowrap'}}>{c.label}</span>
 }
 
 function NumCell({row,field,editingCell,editValue,setEditValue,startEdit,commitEdit,muted}:{
@@ -416,7 +463,7 @@ function NumCell({row,field,editingCell,editValue,setEditValue,startEdit,commitE
   const isEditing = editingCell?.id===row.id&&editingCell.field===field
   const val = row[field] as number
   return (
-    <td style={{padding:'9px 10px',textAlign:'right'}}>
+    <td style={{padding:'9px 8px',textAlign:'right'}}>
       {isEditing
         ? <input autoFocus type="number" value={editValue} onChange={e=>setEditValue(e.target.value)} onBlur={commitEdit} onKeyDown={e=>{if(e.key==='Enter')commitEdit()}} style={{width:'100%',textAlign:'right',border:'1px solid var(--border-strong)',borderRadius:4,padding:'3px 6px',fontSize:13,background:'var(--bg)',outline:'none'}}/>
         : <span onClick={()=>startEdit(row.id,field,val)} style={{cursor:'text',fontSize:13,color:val===0?'var(--text-tertiary)':muted?'var(--text-secondary)':'var(--text-primary)'}} title="Klikni pro úpravu">{val===0?'—':fmt(val)}</span>
