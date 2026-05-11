@@ -21,7 +21,7 @@ header { background: var(--surface); border-bottom: 1px solid var(--border); pad
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; transition: background .3s; }
 .status-dot.ok { background: #22c55e; } .status-dot.err { background: #ef4444; }
 .status-label { font-size: 12px; color: var(--text-muted); }
-main { max-width: 980px; margin: 0 auto; padding: 28px 24px; }
+main { max-width: 1200px; margin: 0 auto; padding: 28px 32px; }
 .page-title { font-size: 22px; font-weight: 600; letter-spacing: -0.03em; margin-bottom: 2px; }
 .page-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
 
@@ -51,7 +51,7 @@ main { max-width: 980px; margin: 0 auto; padding: 28px 24px; }
 .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 col.col-drag { width: 30px; } col.col-kat { width: 15%; } col.col-name { width: 27%; }
-col.col-cl { width: 18%; } col.col-real { width: 18%; } col.col-diff { width: 14%; } col.col-act { width: 30px; }
+col.col-cl { width: 18%; } col.col-real { width: 18%; } col.col-diff { width: 13%; } col.col-flag { width: 30px; } col.col-act { width: 30px; }
 thead th { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); padding: 11px 12px 9px; text-align: left; background: var(--bg); border-bottom: 1px solid var(--border); white-space: nowrap; }
 thead th.r { text-align: right; }
 tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
@@ -76,6 +76,12 @@ tbody tr:hover .drag-handle { color: #aaa; }
 .diff-badge.zero { color: var(--text-muted); } .diff-badge.none { color: #d0cec7; }
 .btn-del { width: 30px; background: none; border: none; cursor: pointer; color: #ccc; padding: 8px 4px; display: flex; align-items: center; justify-content: center; border-radius: 6px; margin: auto; transition: all .15s; }
 .btn-del:hover { color: var(--danger); background: var(--danger-light); }
+.btn-flag { width: 30px; background: none; border: none; cursor: pointer; color: #ddd; padding: 8px 4px; display: flex; align-items: center; justify-content: center; border-radius: 6px; margin: auto; transition: all .15s; font-size: 15px; }
+.btn-flag:hover { color: #f59e0b; }
+.btn-flag.flagged { color: #ef4444; }
+tbody tr.flagged-row { background: #fff8f8; }
+tbody tr.flagged-row:hover { background: #fff1f1; }
+tbody tr.flagged-row td { border-bottom-color: #fecaca; }
 tfoot#tfoot tr { border-top: 2px solid var(--border-strong); }
 tfoot#tfoot td { padding: 10px 12px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; color: var(--text); white-space: nowrap; }
 tfoot#tfoot td.lbl { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); text-align: left; }
@@ -164,20 +170,20 @@ tfoot#tfoot .tot-diff.pos { color: var(--success); } tfoot#tfoot .tot-diff.neg {
       <table>
         <colgroup>
           <col class="col-drag"><col class="col-kat"><col class="col-name">
-          <col class="col-cl"><col class="col-real"><col class="col-diff"><col class="col-act">
+          <col class="col-cl"><col class="col-real"><col class="col-diff"><col class="col-flag"><col class="col-act">
         </colgroup>
         <thead>
           <tr>
             <th></th><th>Kategorie</th><th>Položka</th>
-            <th class="r">CL</th><th class="r">Realita</th><th class="r">Rozdíl</th><th></th>
+            <th class="r">CL</th><th class="r">Realita</th><th class="r">Rozdíl</th><th></th><th></th>
           </tr>
         </thead>
         <tbody id="tbody">
-          <tr><td colspan="7"><div class="loading"><div class="spinner"></div> Načítám data…</div></td></tr>
+          <tr><td colspan="8"><div class="loading"><div class="spinner"></div> Načítám data…</div></td></tr>
         </tbody>
         <tfoot id="tfoot"></tfoot>
         <tfoot id="tfoot-add">
-          <tr><td colspan="7">
+          <tr><td colspan="8">
             <button class="btn-add-row" id="btn-add" onclick="addRow()">
               <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
               Přidat položku
@@ -249,13 +255,13 @@ function updateTfoot() {
   rows.forEach(r=>{const cl=fmt(r.cl_castka),re=fmt(r.real_castka); if(cl!==null){sumCL+=cl;hasCL=true;} if(re!==null){sumR+=re;hasR=true;}});
   const d=hasCL&&hasR?sumR-sumCL:null, dc=d===null?'':Math.abs(d)<0.01?'':d<0?'pos':'neg';
   const tf=document.getElementById('tfoot');
-  if(tf) tf.innerHTML=`<tr><td class="lbl" colspan="3">Celkem</td><td>${hasCL?fmtDisplay(sumCL):'—'}</td><td>${hasR?fmtDisplay(sumR):'—'}</td><td class="tot-diff ${dc}">${d!==null?(d>0?'+':'')+fmtDisplay(d):'—'}</td><td></td></tr>`;
+  if(tf) tf.innerHTML=`<tr><td class="lbl" colspan="3">Celkem</td><td>${hasCL?fmtDisplay(totCL):'—'}</td><td>${hasR?fmtDisplay(totR):'—'}</td><td class="tot-diff ${dc}">${d!==null?(d>0?'+':'')+fmtDisplay(d):'—'}</td><td></td><td></td></tr>`;
 }
 
 function render() {
   const tb=document.getElementById('tbody');
   if(!rows.length) {
-    tb.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><p>Žádné položky pro tento měsíc.</p><button class="btn-copy-prev" onclick="copyFromPrevMonth()"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h7a2 2 0 0 1 2 2v5M2 4l2-2M2 4l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Zkopírovat z předchozího měsíce</button></div></td></tr>`;
+    tb.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">📋</div><p>Žádné položky pro tento měsíc.</p><button class="btn-copy-prev" onclick="copyFromPrevMonth()"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h7a2 2 0 0 1 2 2v5M2 4l2-2M2 4l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Zkopírovat z předchozího měsíce</button></div></td></tr>`;
     document.getElementById('tfoot').innerHTML=''; clearSummary(); return;
   }
   tb.innerHTML=rows.map((r,i)=>{
@@ -264,13 +270,15 @@ function render() {
     const clRaw=cl!==null?cl:'',reRaw=re!==null?re:'';
     const kat=r.kategorie||'',katColor=KAT_COLORS[kat]||'#ddd';
     const isLast=i===rows.length-1,enter=isLast?'onkeydown="handleEnter(event)"':'';
-    return `<tr draggable="true" data-id="${r.id}" data-idx="${i}" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)">
+    const flagged=r.priznak?true:false;
+    return `<tr draggable="true" data-id="${r.id}" data-idx="${i}" class="${flagged?'flagged-row':''}" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)">
       <td><div class="drag-handle" title="Přetáhnout pro přeřazení"><svg width="10" height="16" viewBox="0 0 10 16" fill="none"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div></td>
       <td><div class="kat-wrap"><span class="kat-dot" id="dot-${r.id}" style="background:${katColor}"></span><select class="kat-select" data-id="${r.id}" onchange="saveKat(this)"><option value="">—</option>${KATEGORIE.map(k=>`<option value="${escHtml(k)}"${k===kat?' selected':''}>${escHtml(k)}</option>`).join('')}</select></div></td>
       <td><input class="cell-input" type="text" value="${escHtml(r.nazev)}" placeholder="Název položky…" data-field="nazev" data-id="${r.id}" oninput="schedSave(this)" ${enter}></td>
       <td><input class="cell-input mono" type="text" value="${clDisp}" data-raw="${clRaw}" placeholder="0,00" data-field="cl_castka" data-id="${r.id}" oninput="schedSave(this)" onfocus="switchToRaw(this)" onblur="switchToFormatted(this)" ${enter}></td>
       <td><input class="cell-input mono" type="text" value="${reDisp}" data-raw="${reRaw}" placeholder="0,00" data-field="real_castka" data-id="${r.id}" oninput="schedSave(this)" onfocus="switchToRaw(this)" onblur="switchToFormatted(this)" ${enter}></td>
       <td><span class="diff-badge ${dc}" id="diff-${r.id}">${dt}</span></td>
+      <td><button class="btn-flag${flagged?' flagged':''}" onclick="toggleFlag('${r.id}')" title="${flagged?'Odznačit':'Označit jako problém'}">!</button></td>
       <td><button class="btn-del" onclick="deleteRow('${r.id}')" title="Smazat"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M3.5 3.5l.7 7.5a.5.5 0 0 0 .5.5h4.6a.5.5 0 0 0 .5-.5l.7-7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button></td>
     </tr>`;
   }).join('');
@@ -280,10 +288,10 @@ function render() {
 
 async function load() {
   document.getElementById('month-label').textContent=monthDisplay();
-  document.getElementById('tbody').innerHTML=`<tr><td colspan="7"><div class="loading"><div class="spinner"></div> Načítám…</div></td></tr>`;
+  document.getElementById('tbody').innerHTML=`<tr><td colspan="8"><div class="loading"><div class="spinner"></div> Načítám…</div></td></tr>`;
   document.getElementById('tfoot').innerHTML=''; clearSummary();
   try { rows=await apiGet(monthKey()); setStatus(true); render(); }
-  catch(e) { setStatus(false); document.getElementById('tbody').innerHTML=`<tr><td colspan="7"><div class="loading" style="color:#b91c1c">Nepodařilo se načíst data.</div></td></tr>`; toast('Chyba: '+e.message,true); }
+  catch(e) { setStatus(false); document.getElementById('tbody').innerHTML=`<tr><td colspan="8"><div class="loading" style="color:#b91c1c">Nepodařilo se načíst data.</div></td></tr>`; toast('Chyba: '+e.message,true); }
 }
 
 function switchTab(tab,btn) {
@@ -412,6 +420,17 @@ async function copyFromPrevMonth(){
     for(let i=0;i<pr.length;i++){const r=pr[i];await apiInsert({mesic:monthKey(),nazev:r.nazev,cl_castka:r.cl_castka,real_castka:null,kategorie:r.kategorie||null,poradi:i});}
     rows=await apiGet(monthKey());render();toast(`Zkopírováno ${pr.length} položek`);
   }catch(e){toast('Chyba při kopírování',true);}
+}
+async function toggleFlag(id){
+  const row=rows.find(r=>r.id===id);if(!row)return;
+  const newVal=!row.priznak;
+  row.priznak=newVal;
+  const tr=document.querySelector(`#tbody tr[data-id="${id}"]`);
+  const btn=tr?tr.querySelector('.btn-flag'):null;
+  if(tr){tr.classList.toggle('flagged-row',newVal);}
+  if(btn){btn.classList.toggle('flagged',newVal);btn.title=newVal?'Odznačit':'Označit jako problém';}
+  try{await apiUpdate(id,{priznak:newVal});}
+  catch(e){toast('Chyba při ukládání příznaku',true);row.priznak=!newVal;}
 }
 function changeMonth(d){cur=new Date(cur.getFullYear(),cur.getMonth()+d,1);load();}
 
