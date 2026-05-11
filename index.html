@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Provozní náklady</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -195,10 +195,12 @@
   }
 
   .card-value {
-    font-size: 20px;
+    font-size: 19px;
     font-weight: 600;
-    letter-spacing: -0.03em;
-    font-family: 'DM Mono', monospace;
+    letter-spacing: -0.01em;
+    font-family: 'DM Sans', sans-serif;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   .card-value.success { color: var(--success); }
@@ -219,9 +221,9 @@
     table-layout: fixed;
   }
 
-  col.col-name { width: 44%; }
-  col.col-cl   { width: 20%; }
-  col.col-real { width: 20%; }
+  col.col-name { width: 40%; }
+  col.col-cl   { width: 22%; }
+  col.col-real { width: 22%; }
   col.col-diff { width: 12%; }
   col.col-act  { width: 4%; }
 
@@ -235,6 +237,8 @@
     text-align: left;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    overflow: hidden;
   }
 
   thead th.r { text-align: right; }
@@ -266,7 +270,8 @@
   .cell-input:focus { background: var(--accent-light); }
 
   .cell-input.mono {
-    font-family: 'DM Mono', monospace;
+    font-family: 'DM Sans', sans-serif;
+    font-variant-numeric: tabular-nums;
     font-size: 13px;
     text-align: right;
   }
@@ -275,9 +280,10 @@
     display: block;
     text-align: right;
     padding: 10px 14px;
-    font-family: 'DM Mono', monospace;
+    font-family: 'DM Sans', sans-serif;
     font-size: 12px;
     font-weight: 500;
+    white-space: nowrap;
   }
 
   .diff-badge.pos { color: var(--success); }
@@ -307,9 +313,10 @@
     padding: 11px 14px;
     font-size: 13px;
     font-weight: 600;
-    font-family: 'DM Mono', monospace;
+    font-family: 'DM Sans', sans-serif;
     text-align: right;
     color: var(--text);
+    white-space: nowrap;
   }
   tfoot td:first-child {
     font-family: 'DM Sans', sans-serif;
@@ -455,7 +462,7 @@
       <thead>
         <tr>
           <th>Položka</th>
-          <th class="r">Evidováno v CL</th>
+          <th class="r">CL</th>
           <th class="r">Realita</th>
           <th class="r">Rozdíl</th>
           <th class="c"></th>
