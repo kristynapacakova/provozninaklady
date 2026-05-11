@@ -50,18 +50,23 @@ main { max-width: 1200px; margin: 0 auto; padding: 28px 32px; }
 /* Table */
 .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-col.col-drag { width: 30px; } col.col-kat { width: 13%; } col.col-name { width: 32%; }
-col.col-cl { width: 16%; } col.col-real { width: 16%; } col.col-diff { width: 13%; } col.col-flag { width: 30px; } col.col-act { width: 30px; }
+col.col-drag { width: 28px; } col.col-kat { width: 0; } col.col-name { width: 38%; }
+col.col-cl { width: 17%; } col.col-real { width: 17%; } col.col-diff { width: 14%; } col.col-flag { width: 28px; } col.col-act { width: 28px; }
 thead th { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); padding: 11px 12px 9px; text-align: left; background: var(--bg); border-bottom: 1px solid var(--border); white-space: nowrap; }
 thead th.r { text-align: right; }
+thead th.col-kat-th { display: none; }
 tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: #fafaf8; }
 tbody tr.dragging { opacity: .35; background: var(--accent-light); }
 tbody tr.drag-over-top { box-shadow: inset 0 2px 0 var(--accent); }
 tbody td { padding: 0; vertical-align: middle; }
-tr.kat-separator td { padding: 6px 12px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); background: var(--bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 7px; }
-.kat-sep-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+tbody td.td-kat { display: none; }
+tr.kat-separator { background: none !important; }
+tr.kat-separator td { padding: 14px 12px 5px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); background: none; border-bottom: none; }
+tr.kat-separator:not(:first-child) td { border-top: 1px solid var(--border); padding-top: 16px; }
+.kat-sep-inner { display: flex; align-items: center; gap: 7px; }
+.kat-sep-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
 .drag-handle { width: 30px; display: flex; align-items: center; justify-content: center; cursor: grab; color: #d0cec7; padding: 10px 4px; transition: color .15s; }
 .drag-handle:active { cursor: grabbing; }
 tbody tr:hover .drag-handle { color: #aaa; }
@@ -176,7 +181,7 @@ tfoot#tfoot .tot-diff.pos { color: var(--success); } tfoot#tfoot .tot-diff.neg {
         </colgroup>
         <thead>
           <tr>
-            <th></th><th>Kategorie</th><th>Položka</th>
+            <th></th><th class="col-kat-th"></th><th>Položka</th>
             <th class="r">CL</th><th class="r">Realita</th><th class="r">Rozdíl</th><th></th><th></th>
           </tr>
         </thead>
@@ -289,16 +294,16 @@ function render() {
 
     let separator='';
     if(kat!==lastKat && kat) {
-      separator=`<tr class="kat-separator"><td colspan="8"><span class="kat-sep-dot" style="background:${katColor}"></span>${escHtml(kat)}</td></tr>`;
+      separator=`<tr class="kat-separator"><td colspan="8"><div class="kat-sep-inner"><span class="kat-sep-dot" style="background:${katColor}"></span>${escHtml(kat)}</div></td></tr>`;
     } else if(!kat && lastKat!==null && lastKat!=='') {
-      separator=`<tr class="kat-separator"><td colspan="8"><span class="kat-sep-dot" style="background:#ddd"></span>Bez kategorie</td></tr>`;
+      separator=`<tr class="kat-separator"><td colspan="8"><div class="kat-sep-inner"><span class="kat-sep-dot" style="background:#ccc"></span>Bez kategorie</div></td></tr>`;
     }
     lastKat=kat;
 
     return separator+`<tr draggable="true" data-id="${r.id}" data-idx="${origIdx}" class="${flagged?'flagged-row':''}" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)">
       <td><div class="drag-handle" title="Přetáhnout pro přeřazení"><svg width="10" height="16" viewBox="0 0 10 16" fill="none"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div></td>
-      <td><div class="kat-wrap"><span class="kat-dot" id="dot-${r.id}" style="background:${katColor}"></span><select class="kat-select" data-id="${r.id}" onchange="saveKat(this)"><option value="">—</option>${KATEGORIE.map(k=>`<option value="${escHtml(k)}"${k===kat?' selected':''}>${escHtml(k)}</option>`).join('')}</select></div></td>
-      <td><input class="cell-input" type="text" value="${escHtml(r.nazev)}" placeholder="Název položky…" data-field="nazev" data-id="${r.id}" oninput="schedSave(this)" ${enter}></td>
+      <td class="td-kat"><div class="kat-wrap"><span class="kat-dot" id="dot-${r.id}" style="background:${katColor}"></span><select class="kat-select" data-id="${r.id}" onchange="saveKat(this)"><option value="">—</option>${KATEGORIE.map(k=>`<option value="${escHtml(k)}"${k===kat?' selected':''}>${escHtml(k)}</option>`).join('')}</select></div></td>
+      <td style="display:flex;align-items:center;"><span style="width:6px;height:6px;border-radius:50%;background:${katColor};flex-shrink:0;margin-left:12px;margin-right:8px;"></span><input class="cell-input" style="padding-left:0;" type="text" value="${escHtml(r.nazev)}" placeholder="Název položky…" data-field="nazev" data-id="${r.id}" oninput="schedSave(this)" ${enter}></td>
       <td><input class="cell-input mono" type="text" value="${clDisp}" data-raw="${clRaw}" placeholder="0,00" data-field="cl_castka" data-id="${r.id}" oninput="schedSave(this)" onfocus="switchToRaw(this)" onblur="switchToFormatted(this)" ${enter}></td>
       <td><input class="cell-input mono" type="text" value="${reDisp}" data-raw="${reRaw}" placeholder="0,00" data-field="real_castka" data-id="${r.id}" oninput="schedSave(this)" onfocus="switchToRaw(this)" onblur="switchToFormatted(this)" ${enter}></td>
       <td><span class="diff-badge ${dc}" id="diff-${r.id}">${dt}</span></td>
