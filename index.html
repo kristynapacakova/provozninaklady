@@ -170,12 +170,43 @@
   .btn-primary:hover { opacity: 0.88; }
   .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  .btn-float {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 100px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(29,78,216,0.35);
+    transition: opacity 0.15s, transform 0.15s;
+    z-index: 200;
+  }
+  .btn-float:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-float:disabled { opacity: 0.5; cursor: not-allowed; }
+
   /* Summary cards */
+  .summary-wrap {
+    position: sticky;
+    top: 56px;
+    z-index: 90;
+    background: var(--bg);
+    padding: 12px 0;
+    margin-bottom: 8px;
+  }
+
   .summary {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
-    margin-bottom: 20px;
   }
 
   .card {
@@ -435,18 +466,20 @@
     </button>
   </div>
 
-  <div class="summary">
-    <div class="card">
-      <div class="card-label">Evidováno v CL</div>
-      <div class="card-value" id="sum-cl">—</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Realita</div>
-      <div class="card-value" id="sum-real">—</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Rozdíl</div>
-      <div class="card-value" id="sum-diff">—</div>
+  <div class="summary-wrap">
+    <div class="summary">
+      <div class="card">
+        <div class="card-label">Evidováno v CL</div>
+        <div class="card-value" id="sum-cl">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Realita</div>
+        <div class="card-value" id="sum-real">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Rozdíl</div>
+        <div class="card-value" id="sum-diff">—</div>
+      </div>
     </div>
   </div>
 
@@ -475,6 +508,11 @@
     </table>
   </div>
 </main>
+
+<button class="btn-float" id="btn-add-float" onclick="addRow()">
+  <svg width="16" height="16" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+  Přidat položku
+</button>
 
 <div id="toast"></div>
 
@@ -749,12 +787,13 @@ function updateTfoot() {
 // --- Add row ---
 async function addRow() {
   const btn = document.getElementById('btn-add');
-  btn.disabled = true;
+  const btnF = document.getElementById('btn-add-float');
+  if (btn) btn.disabled = true;
+  if (btnF) btnF.disabled = true;
   try {
     const newRow = await apiInsert({ mesic: monthKey(), nazev: '', cl_castka: null, real_castka: null, poradi: rows.length });
     rows.push(newRow);
     render();
-    // Focus new row name input
     setTimeout(() => {
       const inputs = document.querySelectorAll('#tbody input[data-field="nazev"]');
       if (inputs.length) inputs[inputs.length - 1].focus();
@@ -762,7 +801,8 @@ async function addRow() {
   } catch(e) {
     toast('Nepodařilo se přidat položku', true);
   }
-  btn.disabled = false;
+  if (btn) btn.disabled = false;
+  if (btnF) btnF.disabled = false;
 }
 
 // --- Delete row ---
