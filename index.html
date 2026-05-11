@@ -170,6 +170,17 @@
   .btn-primary:hover { opacity: 0.88; }
   .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  /* Category select */
+  .kat-wrap { position: relative; display: flex; align-items: center; padding: 0 8px; }
+  .kat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-right: 6px; background: #ddd; }
+  .kat-select {
+    width: 100%; background: none; border: none; outline: none;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text);
+    cursor: pointer; padding: 10px 4px 10px 0; appearance: none; -webkit-appearance: none;
+  }
+  .kat-select:focus { background: var(--accent-light); border-radius: 4px; }
+  .kat-select option { background: white; color: #1a1916; }
+
   .btn-add-row {
     display: flex;
     align-items: center;
@@ -247,10 +258,11 @@
     table-layout: fixed;
   }
 
-  col.col-name { width: 36%; }
-  col.col-cl   { width: 22%; }
-  col.col-real { width: 22%; }
-  col.col-diff { width: 16%; }
+  col.col-kat  { width: 16%; }
+  col.col-name { width: 28%; }
+  col.col-cl   { width: 19%; }
+  col.col-real { width: 19%; }
+  col.col-diff { width: 14%; }
   col.col-act  { width: 4%; }
 
   thead th {
@@ -494,6 +506,7 @@
   <div class="table-wrap">
     <table>
       <colgroup>
+        <col class="col-kat">
         <col class="col-name">
         <col class="col-cl">
         <col class="col-real">
@@ -502,6 +515,7 @@
       </colgroup>
       <thead>
         <tr>
+          <th>Kategorie</th>
           <th>Položka</th>
           <th class="r">CL</th>
           <th class="r">Realita</th>
@@ -523,6 +537,9 @@
           </td>
         </tr>
       </tfoot>
+          </td>
+        </tr>
+      </tfoot>
     </table>
   </div>
 </main>
@@ -535,6 +552,20 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const TABLE = 'polozky';
 
 const MONTHS = ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
+
+const KATEGORIE = [
+  'Mzdy','Specialisté','Odvody','Nájemné','Software','Doprava',
+  'Služby','Provoz kanceláře','Zdraví & benefity','Jídlo',
+  'Vzdělávání','Marketing','Hardware','Účetnictví','Ostatní'
+];
+
+const KAT_COLORS = {
+  'Mzdy':'#6366f1','Specialisté':'#8b5cf6','Odvody':'#f59e0b',
+  'Nájemné':'#10b981','Software':'#0ea5e9','Doprava':'#f97316',
+  'Služby':'#ec4899','Provoz kanceláře':'#64748b','Zdraví & benefity':'#22c55e',
+  'Jídlo':'#ef4444','Vzdělávání':'#a855f7','Marketing':'#06b6d4',
+  'Hardware':'#84cc16','Účetnictví':'#78716c','Ostatní':'#94a3b8'
+};
 
 let cur = new Date();
 let rows = [];
@@ -711,7 +742,13 @@ function render() {
     const reDisp = re !== null ? fmtDisplay(re) : '';
     const isLast = i === rows.length - 1;
     const enterAttr = isLast ? 'onkeydown="handleEnter(event)"' : '';
+    const kat = r.kategorie || '';
+    const katColor = KAT_COLORS[kat] || '#ddd';
+    const katOptions = KATEGORIE.map(k =>
+      `<option value="${escHtml(k)}" ${k === kat ? 'selected' : ''}>${escHtml(k)}</option>`
+    ).join('');
     return `<tr data-id="${r.id}">
+      <td><div class="kat-wrap"><span class="kat-dot" id="dot-${r.id}" style="background:${katColor}"></span><select class="kat-select" data-id="${r.id}" onchange="saveKat(this)"><option value="">—</option>${katOptions}</select></div></td>
       <td><input class="cell-input" type="text" value="${escHtml(r.nazev)}" placeholder="Název položky…" data-field="nazev" data-id="${r.id}" oninput="schedSave(this)" ${enterAttr}></td>
       <td><input class="cell-input mono" type="text" value="${clDisp}" data-raw="${clVal}" placeholder="0,00" data-field="cl_castka" data-id="${r.id}" oninput="schedSave(this)" onfocus="switchToRaw(this)" onblur="switchToFormatted(this)" ${enterAttr}></td>
       <td><input class="cell-input mono" type="text" value="${reDisp}" data-raw="${reVal}" placeholder="0,00" data-field="real_castka" data-id="${r.id}" oninput="schedSave(this)" onfocus="switchToRaw(this)" onblur="switchToFormatted(this)" ${enterAttr}></td>
@@ -732,7 +769,7 @@ function render() {
   const td = hasCL && hasR ? sumR - sumCL : null;
   const tdc = td === null ? '' : Math.abs(td) < 0.01 ? '' : td < 0 ? 'pos' : 'neg';
   tf.innerHTML = `<tr>
-    <td style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:left;padding:11px 14px;">Celkem</td>
+    <td style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:left;padding:11px 14px;" colspan="2">Celkem</td>
     <td>${hasCL ? fmtDisplay(sumCL) : '—'}</td>
     <td>${hasR ? fmtDisplay(sumR) : '—'}</td>
     <td class="tot-diff ${tdc}">${td !== null ? (td > 0 ? '+' : '') + fmtDisplay(td) : '—'}</td>
@@ -795,7 +832,7 @@ function updateTfoot() {
   const tdc = td === null ? '' : Math.abs(td) < 0.01 ? '' : td < 0 ? 'pos' : 'neg';
   const tf = document.getElementById('tfoot');
   if (tf) tf.innerHTML = `<tr>
-    <td style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:left;padding:11px 14px;">Celkem</td>
+    <td style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:left;padding:11px 14px;" colspan="2">Celkem</td>
     <td>${hasCL ? fmtDisplay(sumCL) : '—'}</td>
     <td>${hasR ? fmtDisplay(sumR) : '—'}</td>
     <td class="tot-diff ${tdc}">${td !== null ? (td > 0 ? '+' : '') + fmtDisplay(td) : '—'}</td>
@@ -804,6 +841,17 @@ function updateTfoot() {
 }
 
 // --- Add row ---
+async function saveKat(select) {
+  const id = select.dataset.id;
+  const kat = select.value;
+  const row = rows.find(r => r.id === id);
+  if (row) row.kategorie = kat;
+  const dot = document.getElementById('dot-' + id);
+  if (dot) dot.style.background = KAT_COLORS[kat] || '#ddd';
+  try { await apiUpdate(id, { kategorie: kat || null }); }
+  catch(e) { toast('Chyba při ukládání kategorie', true); }
+}
+
 function handleEnter(e) {
   if (e.key === 'Enter') { e.preventDefault(); addRow(); }
 }
@@ -867,7 +915,7 @@ async function copyFromPrevMonth() {
     }
     for (let i = 0; i < prevRows.length; i++) {
       const r = prevRows[i];
-      await apiInsert({ mesic: monthKey(), nazev: r.nazev, cl_castka: r.cl_castka, real_castka: null, poradi: i });
+      await apiInsert({ mesic: monthKey(), nazev: r.nazev, cl_castka: r.cl_castka, real_castka: null, kategorie: r.kategorie || null, poradi: i });
     }
     rows = await apiGet(monthKey());
     render();
