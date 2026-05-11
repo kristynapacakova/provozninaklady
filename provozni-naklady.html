@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Provozní náklady</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f4f1;
+    --surface: #ffffff;
+    --border: #e2e0da;
+    --border-strong: #c8c5bc;
+    --text: #1a1916;
+    --text-muted: #7a7870;
+    --text-faint: #b0ae a8;
+    --accent: #1d4ed8;
+    --accent-light: #eff4ff;
+    --success: #15803d;
+    --success-light: #f0fdf4;
+    --danger: #b91c1c;
+    --danger-light: #fff1f1;
+    --warn: #b45309;
+    --warn-light: #fffbeb;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #ccc;
+    transition: background 0.3s;
+  }
+  .status-dot.ok { background: #22c55e; }
+  .status-dot.err { background: #ef4444; }
+
+  .status-label {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+
+  .page-title {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    margin-bottom: 4px;
+  }
+
+  .page-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 28px;
+  }
+
+  /* Month nav */
+  .month-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .month-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .btn-month {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: var(--radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 16px;
+    transition: all 0.15s;
+  }
+
+  .btn-month:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  .month-label {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    min-width: 150px;
+    text-align: center;
+    padding: 0 8px;
+  }
+
+  .btn-primary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Summary cards */
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+  }
+
+  .card-label {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+
+  .card-value {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .card-value.success { color: var(--success); }
+  .card-value.danger { color: var(--danger); }
+  .card-value.warn { color: var(--warn); }
+
+  /* Table */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  col.col-name { width: 44%; }
+  col.col-cl   { width: 20%; }
+  col.col-real { width: 20%; }
+  col.col-diff { width: 12%; }
+  col.col-act  { width: 4%; }
+
+  thead th {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    padding: 12px 14px 10px;
+    text-align: left;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  thead th.r { text-align: right; }
+  thead th.c { text-align: center; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #fafaf8; }
+
+  tbody td { padding: 0; vertical-align: middle; }
+
+  .cell-input {
+    width: 100%;
+    background: none;
+    border: none;
+    outline: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13.5px;
+    color: var(--text);
+    padding: 10px 14px;
+    transition: background 0.15s;
+  }
+
+  .cell-input::placeholder { color: #c5c3bc; }
+  .cell-input:focus { background: var(--accent-light); }
+
+  .cell-input.mono {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    text-align: right;
+  }
+
+  .diff-badge {
+    display: block;
+    text-align: right;
+    padding: 10px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .diff-badge.pos { color: var(--success); }
+  .diff-badge.neg { color: var(--danger); }
+  .diff-badge.zero { color: var(--text-muted); }
+  .diff-badge.none { color: #d0cec7; }
+
+  .btn-del {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #ccc;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    margin: auto;
+    transition: all 0.15s;
+    font-size: 15px;
+  }
+
+  .btn-del:hover { color: var(--danger); background: var(--danger-light); }
+
+  tfoot tr { border-top: 2px solid var(--border-strong); }
+  tfoot td {
+    padding: 11px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'DM Mono', monospace;
+    text-align: right;
+    color: var(--text);
+  }
+  tfoot td:first-child {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    text-align: left;
+  }
+  tfoot .tot-diff.pos { color: var(--success); }
+  tfoot .tot-diff.neg { color: var(--danger); }
+
+  /* Empty state */
+  .empty {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-muted);
+  }
+
+  .empty-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.35;
+  }
+
+  .empty p { font-size: 13px; }
+
+  /* Loading overlay */
+  .loading {
+    text-align: center;
+    padding: 48px;
+    color: var(--text-muted);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Toast */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--text);
+    color: white;
+    font-size: 13px;
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 999;
+    max-width: 280px;
+  }
+
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.err { background: var(--danger); }
+
+  .save-indicator {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  @media (max-width: 600px) {
+    main { padding: 20px 16px; }
+    header { padding: 0 16px; }
+    .summary { grid-template-columns: 1fr; }
+    col.col-cl, col.col-real { width: 22%; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    Provozní náklady
+  </div>
+  <div class="header-right">
+    <div class="status-dot" id="status-dot"></div>
+    <span class="status-label" id="status-label">Připojování…</span>
+  </div>
+</header>
+
+<main>
+  <div class="page-title">Přehled nákladů</div>
+  <div class="page-sub">Porovnání evidovaných nákladů v Costlocker vs. reálně zaplaceno</div>
+
+  <div class="month-bar">
+    <div class="month-nav">
+      <button class="btn-month" onclick="changeMonth(-1)" title="Předchozí měsíc">&#8249;</button>
+      <span class="month-label" id="month-label">—</span>
+      <button class="btn-month" onclick="changeMonth(1)" title="Další měsíc">&#8250;</button>
+    </div>
+    <button class="btn-primary" id="btn-add" onclick="addRow()">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      Přidat položku
+    </button>
+  </div>
+
+  <div class="summary">
+    <div class="card">
+      <div class="card-label">Evidováno v CL</div>
+      <div class="card-value" id="sum-cl">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Realita</div>
+      <div class="card-value" id="sum-real">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rozdíl</div>
+      <div class="card-value" id="sum-diff">—</div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <colgroup>
+        <col class="col-name">
+        <col class="col-cl">
+        <col class="col-real">
+        <col class="col-diff">
+        <col class="col-act">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Položka</th>
+          <th class="r">Evidováno v CL</th>
+          <th class="r">Realita</th>
+          <th class="r">Rozdíl</th>
+          <th class="c"></th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="5"><div class="loading"><div class="spinner"></div> Načítám data…</div></td></tr>
+      </tbody>
+      <tfoot id="tfoot"></tfoot>
+    </table>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://pcrzjvqpjktpotczdrxj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjcnpqdnFwamt0cG90Y3pkcnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0OTA5MTAsImV4cCI6MjA5NDA2NjkxMH0.YVKmxQUmPFhGx2ffhBDdcc8U-p2JJebesIvMZWCpFAQ';
+const TABLE = 'polozky';
+
+const MONTHS = ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
+
+let cur = new Date();
+let rows = [];
+let saveTimers = {};
+
+function monthKey() {
+  return `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
+}
+
+function monthDisplay() {
+  return `${MONTHS[cur.getMonth()]} ${cur.getFullYear()}`;
+}
+
+// --- API helpers ---
+async function apiGet(mesic) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?mesic=eq.${mesic}&order=poradi.asc,created_at.asc`, {
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function apiInsert(row) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify(row)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return (await res.json())[0];
+}
+
+async function apiUpdate(id, patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+async function apiDelete(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// --- UI helpers ---
+function setStatus(ok) {
+  const dot = document.getElementById('status-dot');
+  const lbl = document.getElementById('status-label');
+  dot.className = 'status-dot ' + (ok ? 'ok' : 'err');
+  lbl.textContent = ok ? 'Připojeno' : 'Chyba připojení';
+}
+
+let toastTimer;
+function toast(msg, isErr = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (isErr ? ' err' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 2800);
+}
+
+function fmt(n) {
+  if (n === null || n === undefined || n === '') return null;
+  const v = parseFloat(String(n).replace(',','.').replace(/\s/g,''));
+  return isNaN(v) ? null : v;
+}
+
+function fmtDisplay(n) {
+  if (n === null || n === undefined) return '—';
+  return n.toLocaleString('cs-CZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kč';
+}
+
+// --- Load ---
+async function load() {
+  document.getElementById('month-label').textContent = monthDisplay();
+  document.getElementById('tbody').innerHTML = `<tr><td colspan="5"><div class="loading"><div class="spinner"></div> Načítám…</div></td></tr>`;
+  document.getElementById('tfoot').innerHTML = '';
+  clearSummary();
+
+  try {
+    rows = await apiGet(monthKey());
+    setStatus(true);
+    render();
+  } catch(e) {
+    setStatus(false);
+    document.getElementById('tbody').innerHTML = `<tr><td colspan="5"><div class="loading" style="color:#b91c1c">Nepodařilo se načíst data. Zkontroluj připojení.</div></td></tr>`;
+    toast('Chyba: ' + e.message, true);
+  }
+}
+
+function clearSummary() {
+  document.getElementById('sum-cl').textContent = '—';
+  document.getElementById('sum-real').textContent = '—';
+  document.getElementById('sum-diff').textContent = '—';
+  document.getElementById('sum-diff').className = 'card-value';
+}
+
+function updateSummary() {
+  let sumCL = 0, sumR = 0, hasCL = false, hasR = false;
+  rows.forEach(r => {
+    const cl = fmt(r.cl_castka);
+    const re = fmt(r.real_castka);
+    if (cl !== null) { sumCL += cl; hasCL = true; }
+    if (re !== null) { sumR += re; hasR = true; }
+  });
+
+  document.getElementById('sum-cl').textContent = hasCL ? fmtDisplay(sumCL) : '—';
+  document.getElementById('sum-real').textContent = hasR ? fmtDisplay(sumR) : '—';
+
+  const diffEl = document.getElementById('sum-diff');
+  if (hasCL && hasR) {
+    const d = sumR - sumCL;
+    diffEl.textContent = (d > 0 ? '+' : '') + fmtDisplay(d);
+    diffEl.className = 'card-value ' + (Math.abs(d) < 0.01 ? '' : d < 0 ? 'success' : 'danger');
+  } else {
+    diffEl.textContent = '—';
+    diffEl.className = 'card-value';
+  }
+}
+
+function diffClass(cl, re) {
+  if (cl === null || re === null) return 'none';
+  const d = re - cl;
+  if (Math.abs(d) < 0.01) return 'zero';
+  return d < 0 ? 'pos' : 'neg';
+}
+
+function diffText(cl, re) {
+  if (cl === null || re === null) return '—';
+  const d = re - cl;
+  return (d > 0 ? '+' : '') + fmtDisplay(d);
+}
+
+function render() {
+  const tb = document.getElementById('tbody');
+  const tf = document.getElementById('tfoot');
+
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="5"><div class="empty">
+      <div class="empty-icon">📋</div>
+      <p>Žádné položky pro tento měsíc.<br>Klikni na „Přidat položku".</p>
+    </div></td></tr>`;
+    tf.innerHTML = '';
+    clearSummary();
+    return;
+  }
+
+  tb.innerHTML = rows.map((r, i) => {
+    const cl = fmt(r.cl_castka);
+    const re = fmt(r.real_castka);
+    const dc = diffClass(cl, re);
+    const dt = diffText(cl, re);
+    return `<tr data-id="${r.id}">
+      <td><input class="cell-input" type="text" value="${escHtml(r.nazev)}" placeholder="Název položky…" data-field="nazev" data-id="${r.id}" oninput="schedSave(this)"></td>
+      <td><input class="cell-input mono" type="text" value="${r.cl_castka !== null && r.cl_castka !== undefined ? r.cl_castka : ''}" placeholder="0,00" data-field="cl_castka" data-id="${r.id}" oninput="schedSave(this)"></td>
+      <td><input class="cell-input mono" type="text" value="${r.real_castka !== null && r.real_castka !== undefined ? r.real_castka : ''}" placeholder="0,00" data-field="real_castka" data-id="${r.id}" oninput="schedSave(this)"></td>
+      <td><span class="diff-badge ${dc}" id="diff-${r.id}">${dt}</span></td>
+      <td><button class="btn-del" onclick="deleteRow('${r.id}')" title="Smazat">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M3.5 3.5l.7 7.5a.5.5 0 0 0 .5.5h4.6a.5.5 0 0 0 .5-.5l.7-7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button></td>
+    </tr>`;
+  }).join('');
+
+  // Tfoot
+  let sumCL = 0, sumR = 0, hasCL = false, hasR = false;
+  rows.forEach(r => {
+    const cl = fmt(r.cl_castka); const re = fmt(r.real_castka);
+    if (cl !== null) { sumCL += cl; hasCL = true; }
+    if (re !== null) { sumR += re; hasR = true; }
+  });
+  const td = hasCL && hasR ? sumR - sumCL : null;
+  const tdc = td === null ? '' : Math.abs(td) < 0.01 ? '' : td < 0 ? 'pos' : 'neg';
+  tf.innerHTML = `<tr>
+    <td style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:left;padding:11px 14px;">Celkem</td>
+    <td>${hasCL ? fmtDisplay(sumCL) : '—'}</td>
+    <td>${hasR ? fmtDisplay(sumR) : '—'}</td>
+    <td class="tot-diff ${tdc}">${td !== null ? (td > 0 ? '+' : '') + fmtDisplay(td) : '—'}</td>
+    <td></td>
+  </tr>`;
+
+  updateSummary();
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// --- Debounced save ---
+function schedSave(input) {
+  const id = input.dataset.id;
+  const field = input.dataset.field;
+  const val = input.value;
+
+  // Update local immediately for diff recalc
+  const row = rows.find(r => r.id === id);
+  if (row) {
+    row[field] = field === 'nazev' ? val : (val === '' ? null : val);
+    // Recalc diff badge
+    const cl = fmt(row.cl_castka);
+    const re = fmt(row.real_castka);
+    const badge = document.getElementById('diff-' + id);
+    if (badge) {
+      badge.textContent = diffText(cl, re);
+      badge.className = 'diff-badge ' + diffClass(cl, re);
+    }
+    updateSummary();
+    updateTfoot();
+  }
+
+  clearTimeout(saveTimers[id + field]);
+  saveTimers[id + field] = setTimeout(async () => {
+    try {
+      const patch = {};
+      if (field === 'nazev') patch.nazev = val;
+      else patch[field] = val === '' ? null : parseFloat(val.replace(',','.').replace(/\s/g,'')) || null;
+      await apiUpdate(id, patch);
+    } catch(e) {
+      toast('Chyba při ukládání', true);
+    }
+  }, 600);
+}
+
+function updateTfoot() {
+  let sumCL = 0, sumR = 0, hasCL = false, hasR = false;
+  rows.forEach(r => {
+    const cl = fmt(r.cl_castka); const re = fmt(r.real_castka);
+    if (cl !== null) { sumCL += cl; hasCL = true; }
+    if (re !== null) { sumR += re; hasR = true; }
+  });
+  const td = hasCL && hasR ? sumR - sumCL : null;
+  const tdc = td === null ? '' : Math.abs(td) < 0.01 ? '' : td < 0 ? 'pos' : 'neg';
+  const tf = document.getElementById('tfoot');
+  if (tf) tf.innerHTML = `<tr>
+    <td style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);text-align:left;padding:11px 14px;">Celkem</td>
+    <td>${hasCL ? fmtDisplay(sumCL) : '—'}</td>
+    <td>${hasR ? fmtDisplay(sumR) : '—'}</td>
+    <td class="tot-diff ${tdc}">${td !== null ? (td > 0 ? '+' : '') + fmtDisplay(td) : '—'}</td>
+    <td></td>
+  </tr>`;
+}
+
+// --- Add row ---
+async function addRow() {
+  const btn = document.getElementById('btn-add');
+  btn.disabled = true;
+  try {
+    const newRow = await apiInsert({ mesic: monthKey(), nazev: '', cl_castka: null, real_castka: null, poradi: rows.length });
+    rows.push(newRow);
+    render();
+    // Focus new row name input
+    setTimeout(() => {
+      const inputs = document.querySelectorAll('#tbody input[data-field="nazev"]');
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    }, 50);
+  } catch(e) {
+    toast('Nepodařilo se přidat položku', true);
+  }
+  btn.disabled = false;
+}
+
+// --- Delete row ---
+async function deleteRow(id) {
+  if (!confirm('Smazat tuto položku?')) return;
+  try {
+    await apiDelete(id);
+    rows = rows.filter(r => r.id !== id);
+    render();
+    toast('Položka smazána');
+  } catch(e) {
+    toast('Chyba při mazání', true);
+  }
+}
+
+// --- Month nav ---
+function changeMonth(d) {
+  cur = new Date(cur.getFullYear(), cur.getMonth() + d, 1);
+  load();
+}
+
+// --- Init ---
+load();
+</script>
+</body>
+</html>
