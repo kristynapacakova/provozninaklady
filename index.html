@@ -170,28 +170,23 @@
   .btn-primary:hover { opacity: 0.88; }
   .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  .btn-float {
-    position: fixed;
-    bottom: 28px;
-    right: 28px;
+  .btn-add-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    background: var(--accent);
-    color: white;
+    gap: 7px;
+    background: none;
     border: none;
-    border-radius: 100px;
-    padding: 12px 20px;
-    font-size: 14px;
-    font-weight: 500;
+    padding: 10px 14px;
+    font-size: 13px;
     font-family: 'DM Sans', sans-serif;
+    color: var(--text-muted);
     cursor: pointer;
-    box-shadow: 0 4px 16px rgba(29,78,216,0.35);
-    transition: opacity 0.15s, transform 0.15s;
-    z-index: 200;
+    width: 100%;
+    text-align: left;
+    transition: color 0.15s, background 0.15s;
+    border-radius: 0;
   }
-  .btn-float:hover { opacity: 0.9; transform: translateY(-1px); }
-  .btn-float:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-add-row:hover { color: var(--accent); background: var(--accent-light); }
 
   /* Summary cards */
   .summary-wrap {
@@ -477,10 +472,6 @@
       <span class="month-label" id="month-label">—</span>
       <button class="btn-month" onclick="changeMonth(1)" title="Další měsíc">&#8250;</button>
     </div>
-    <button class="btn-primary" id="btn-add" onclick="addRow()">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      Přidat položku
-    </button>
   </div>
 
   <div class="summary-wrap">
@@ -522,14 +513,19 @@
         <tr><td colspan="5"><div class="loading"><div class="spinner"></div> Načítám data…</div></td></tr>
       </tbody>
       <tfoot id="tfoot"></tfoot>
+      <tfoot>
+        <tr>
+          <td colspan="5">
+            <button class="btn-add-row" id="btn-add" onclick="addRow()">
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              Přidat položku
+            </button>
+          </td>
+        </tr>
+      </tfoot>
     </table>
   </div>
 </main>
-
-<button class="btn-float" id="btn-add-float" onclick="addRow()">
-  <svg width="16" height="16" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-  Přidat položku
-</button>
 
 <div id="toast"></div>
 
@@ -713,10 +709,12 @@ function render() {
     const reVal = re !== null ? re : '';
     const clDisp = cl !== null ? fmtDisplay(cl) : '';
     const reDisp = re !== null ? fmtDisplay(re) : '';
+    const isLast = i === rows.length - 1;
+    const enterAttr = isLast ? 'onkeydown="handleEnter(event)"' : '';
     return `<tr data-id="${r.id}">
-      <td><input class="cell-input" type="text" value="${escHtml(r.nazev)}" placeholder="Název položky…" data-field="nazev" data-id="${r.id}" oninput="schedSave(this)"></td>
-      <td><input class="cell-input mono" type="text" value="${clDisp}" data-raw="${clVal}" placeholder="0,00" data-field="cl_castka" data-id="${r.id}" oninput="schedSave(this)" onfocus="switchToRaw(this)" onblur="switchToFormatted(this)"></td>
-      <td><input class="cell-input mono" type="text" value="${reDisp}" data-raw="${reVal}" placeholder="0,00" data-field="real_castka" data-id="${r.id}" oninput="schedSave(this)" onfocus="switchToRaw(this)" onblur="switchToFormatted(this)"></td>
+      <td><input class="cell-input" type="text" value="${escHtml(r.nazev)}" placeholder="Název položky…" data-field="nazev" data-id="${r.id}" oninput="schedSave(this)" ${enterAttr}></td>
+      <td><input class="cell-input mono" type="text" value="${clDisp}" data-raw="${clVal}" placeholder="0,00" data-field="cl_castka" data-id="${r.id}" oninput="schedSave(this)" onfocus="switchToRaw(this)" onblur="switchToFormatted(this)" ${enterAttr}></td>
+      <td><input class="cell-input mono" type="text" value="${reDisp}" data-raw="${reVal}" placeholder="0,00" data-field="real_castka" data-id="${r.id}" oninput="schedSave(this)" onfocus="switchToRaw(this)" onblur="switchToFormatted(this)" ${enterAttr}></td>
       <td><span class="diff-badge ${dc}" id="diff-${r.id}">${dt}</span></td>
       <td><button class="btn-del" onclick="deleteRow('${r.id}')" title="Smazat">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M3.5 3.5l.7 7.5a.5.5 0 0 0 .5.5h4.6a.5.5 0 0 0 .5-.5l.7-7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -806,11 +804,13 @@ function updateTfoot() {
 }
 
 // --- Add row ---
+function handleEnter(e) {
+  if (e.key === 'Enter') { e.preventDefault(); addRow(); }
+}
+
 async function addRow() {
   const btn = document.getElementById('btn-add');
-  const btnF = document.getElementById('btn-add-float');
   if (btn) btn.disabled = true;
-  if (btnF) btnF.disabled = true;
   try {
     const newRow = await apiInsert({ mesic: monthKey(), nazev: '', cl_castka: null, real_castka: null, poradi: rows.length });
     rows.push(newRow);
@@ -823,7 +823,6 @@ async function addRow() {
     toast('Nepodařilo se přidat položku', true);
   }
   if (btn) btn.disabled = false;
-  if (btnF) btnF.disabled = false;
 }
 
 // --- Delete row ---
