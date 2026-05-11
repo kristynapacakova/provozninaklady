@@ -60,6 +60,8 @@ tbody tr:hover { background: #fafaf8; }
 tbody tr.dragging { opacity: .35; background: var(--accent-light); }
 tbody tr.drag-over-top { box-shadow: inset 0 2px 0 var(--accent); }
 tbody td { padding: 0; vertical-align: middle; }
+tr.kat-separator td { padding: 6px 12px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); background: var(--bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 7px; }
+.kat-sep-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
 .drag-handle { width: 30px; display: flex; align-items: center; justify-content: center; cursor: grab; color: #d0cec7; padding: 10px 4px; transition: color .15s; }
 .drag-handle:active { cursor: grabbing; }
 tbody tr:hover .drag-handle { color: #aaa; }
@@ -264,14 +266,36 @@ function render() {
     tb.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">📋</div><p>Žádné položky pro tento měsíc.</p><button class="btn-copy-prev" onclick="copyFromPrevMonth()"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h7a2 2 0 0 1 2 2v5M2 4l2-2M2 4l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Zkopírovat z předchozího měsíce</button></div></td></tr>`;
     document.getElementById('tfoot').innerHTML=''; clearSummary(); return;
   }
-  tb.innerHTML=rows.map((r,i)=>{
+
+  // Seřadit podle kategorie, bez kategorie na konec
+  const katOrder = KATEGORIE.reduce((acc,k,i)=>{acc[k]=i;return acc;},{});
+  const sorted = [...rows].sort((a,b)=>{
+    const ka=a.kategorie||'', kb=b.kategorie||'';
+    if(!ka&&kb) return 1; if(ka&&!kb) return -1; if(!ka&&!kb) return 0;
+    const oa=katOrder[ka]??99, ob=katOrder[kb]??99;
+    if(oa!==ob) return oa-ob;
+    return (a.poradi??0)-(b.poradi??0);
+  });
+
+  let lastKat=null;
+  tb.innerHTML=sorted.map((r,i)=>{
     const cl=fmt(r.cl_castka),re=fmt(r.real_castka),dc=diffClass(cl,re),dt=diffText(cl,re);
     const clDisp=cl!==null?fmtDisplay(cl):'',reDisp=re!==null?fmtDisplay(re):'';
     const clRaw=cl!==null?cl:'',reRaw=re!==null?re:'';
     const kat=r.kategorie||'',katColor=KAT_COLORS[kat]||'#ddd';
-    const isLast=i===rows.length-1,enter=isLast?'onkeydown="handleEnter(event)"':'';
+    const isLast=i===sorted.length-1,enter=isLast?'onkeydown="handleEnter(event)"':'';
     const flagged=r.priznak?true:false;
-    return `<tr draggable="true" data-id="${r.id}" data-idx="${i}" class="${flagged?'flagged-row':''}" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)">
+    const origIdx=rows.findIndex(x=>x.id===r.id);
+
+    let separator='';
+    if(kat!==lastKat && kat) {
+      separator=`<tr class="kat-separator"><td colspan="8"><span class="kat-sep-dot" style="background:${katColor}"></span>${escHtml(kat)}</td></tr>`;
+    } else if(!kat && lastKat!==null && lastKat!=='') {
+      separator=`<tr class="kat-separator"><td colspan="8"><span class="kat-sep-dot" style="background:#ddd"></span>Bez kategorie</td></tr>`;
+    }
+    lastKat=kat;
+
+    return separator+`<tr draggable="true" data-id="${r.id}" data-idx="${origIdx}" class="${flagged?'flagged-row':''}" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)">
       <td><div class="drag-handle" title="Přetáhnout pro přeřazení"><svg width="10" height="16" viewBox="0 0 10 16" fill="none"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div></td>
       <td><div class="kat-wrap"><span class="kat-dot" id="dot-${r.id}" style="background:${katColor}"></span><select class="kat-select" data-id="${r.id}" onchange="saveKat(this)"><option value="">—</option>${KATEGORIE.map(k=>`<option value="${escHtml(k)}"${k===kat?' selected':''}>${escHtml(k)}</option>`).join('')}</select></div></td>
       <td><input class="cell-input" type="text" value="${escHtml(r.nazev)}" placeholder="Název položky…" data-field="nazev" data-id="${r.id}" oninput="schedSave(this)" ${enter}></td>
