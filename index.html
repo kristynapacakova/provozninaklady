@@ -50,8 +50,8 @@ main { max-width: 1200px; margin: 0 auto; padding: 28px 32px; }
 /* Table */
 .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-col.col-drag { width: 30px; } col.col-kat { width: 15%; } col.col-name { width: 27%; }
-col.col-cl { width: 18%; } col.col-real { width: 18%; } col.col-diff { width: 13%; } col.col-flag { width: 30px; } col.col-act { width: 30px; }
+col.col-drag { width: 30px; } col.col-kat { width: 13%; } col.col-name { width: 32%; }
+col.col-cl { width: 16%; } col.col-real { width: 16%; } col.col-diff { width: 13%; } col.col-flag { width: 30px; } col.col-act { width: 30px; }
 thead th { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); padding: 11px 12px 9px; text-align: left; background: var(--bg); border-bottom: 1px solid var(--border); white-space: nowrap; }
 thead th.r { text-align: right; }
 tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
@@ -255,7 +255,7 @@ function updateTfoot() {
   rows.forEach(r=>{const cl=fmt(r.cl_castka),re=fmt(r.real_castka); if(cl!==null){sumCL+=cl;hasCL=true;} if(re!==null){sumR+=re;hasR=true;}});
   const d=hasCL&&hasR?sumR-sumCL:null, dc=d===null?'':Math.abs(d)<0.01?'':d<0?'pos':'neg';
   const tf=document.getElementById('tfoot');
-  if(tf) tf.innerHTML=`<tr><td class="lbl" colspan="3">Celkem</td><td>${hasCL?fmtDisplay(totCL):'—'}</td><td>${hasR?fmtDisplay(totR):'—'}</td><td class="tot-diff ${dc}">${d!==null?(d>0?'+':'')+fmtDisplay(d):'—'}</td><td></td><td></td></tr>`;
+  if(tf) tf.innerHTML=`<tr><td class="lbl" colspan="3">Celkem</td><td>${hasCL?fmtDisplay(sumCL):'—'}</td><td>${hasR?fmtDisplay(sumR):'—'}</td><td class="tot-diff ${dc}">${d!==null?(d>0?'+':'')+fmtDisplay(d):'—'}</td><td></td><td></td></tr>`;
 }
 
 function render() {
