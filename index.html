@@ -4,467 +4,618 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Provozní náklady</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-:root {
-  --bg: #f4f5f9; --surface: #fff; --border: #e4e6f0; --border-strong: #c8cbdc; --navy: #2d3561;
-  --text: #1e2240; --text-muted: #7a7f9a; --accent: #6b21e8; --accent-light: #f3eeff;
-  --success: #0e7f4f; --danger: #c0392b; --danger-light: #fdf0ef;
-  --radius: 8px; --radius-lg: 14px;
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f4f5f9;--surface:#fff;--border:#e4e6f0;--border-strong:#c8cbdc;
+  --navy:#2d3561;--text:#1e2240;--muted:#7a7f9a;
+  --accent:#6b21e8;--accent-light:#f3eeff;
+  --ok:#0e7f4f;--err:#c0392b;--err-light:#fdf0ef;
+  --r:8px;--rl:14px;
 }
-body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; line-height: 1.5; }
-header { background: #2d3561; border-bottom: none; padding: 0 32px; height: 58px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
-.logo { font-size: 15px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; display: flex; align-items: center; gap: 10px; color: #fff; }
-.logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
-.header-right { display: flex; align-items: center; gap: 8px; }
-.status-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.3); transition: background .3s; }
-.status-dot.ok { background: #22c55e; } .status-dot.err { background: #ef4444; }
-.status-label { font-size: 12px; color: rgba(255,255,255,.55); }
-main { max-width: 1200px; margin: 0 auto; padding: 28px 32px; }
-.page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 2px; color: #2d3561; }
-.page-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+
+/* Header */
+header{background:var(--navy);height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;position:sticky;top:0;z-index:100}
+.logo{font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;display:flex;align-items:center;gap:9px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.hdr-right{display:flex;align-items:center;gap:7px}
+.sdot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.25);transition:background .3s}
+.sdot.ok{background:#4ade80}.sdot.err{background:#f87171}
+.slbl{font-size:12px;color:rgba(255,255,255,.5)}
+
+/* Main */
+main{max-width:1180px;margin:0 auto;padding:28px 32px}
+.ttl{font-size:21px;font-weight:700;letter-spacing:-.02em;color:var(--navy);margin-bottom:2px}
+.sub{font-size:13px;color:var(--muted);margin-bottom:20px}
 
 /* Tabs */
-.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
-.tab-btn { padding: 8px 16px; font-size: 13px; font-weight: 500; font-family: 'DM Sans', sans-serif; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-muted); cursor: pointer; margin-bottom: -1px; transition: color .15s, border-color .15s; }
-.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
-.tab-btn:hover:not(.active) { color: var(--text); }
-.tab-pane { display: none; } .tab-pane.active { display: block; }
+.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:16px}
+.tab{padding:8px 18px;font-size:13px;font-weight:500;font-family:inherit;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer;margin-bottom:-1px;transition:color .15s,border-color .15s}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.tab:hover:not(.on){color:var(--text)}
+.pane{display:none}.pane.on{display:block}
 
-/* Month bar */
-.month-bar { display: flex; align-items: center; margin-bottom: 14px; }
-.month-nav { display: flex; align-items: center; gap: 4px; }
-.btn-month { width: 32px; height: 32px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 18px; transition: all .15s; }
-.btn-month:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
-.month-label { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; min-width: 150px; text-align: center; color: #2d3561; }
+/* Month nav */
+.mbar{display:flex;align-items:center;margin-bottom:14px}
+.mnav{display:flex;align-items:center;gap:4px}
+.mbtn{width:32px;height:32px;border:1px solid var(--border);background:var(--surface);border-radius:var(--r);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:18px;transition:all .15s}
+.mbtn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light)}
+.mlbl{font-size:15px;font-weight:700;min-width:148px;text-align:center;color:var(--navy)}
 
-/* Summary */
-.summary-wrap { position: sticky; top: 58px; z-index: 90; background: var(--bg); padding: 8px 0 14px; }
-.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 20px; } .card:nth-child(1) { border-top: 3px solid #2d3561; } .card:nth-child(2) { border-top: 3px solid #6b21e8; } .card:nth-child(3) { border-top: 3px solid #06b6d4; }
-.card-label { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 5px; }
-.card-value { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; color: #2d3561; }
-.card-value.success { color: var(--success); } .card-value.danger { color: var(--danger); }
+/* Summary cards */
+.swrap{position:sticky;top:56px;z-index:90;background:var(--bg);padding:8px 0 14px}
+.scards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:15px 20px}
+.sc:nth-child(1){border-top:3px solid var(--navy)}
+.sc:nth-child(2){border-top:3px solid var(--accent)}
+.sc:nth-child(3){border-top:3px solid #06b6d4}
+.sc-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:5px}
+.sc-val{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--navy)}
+.sc-val.ok{color:var(--ok)}.sc-val.err{color:var(--err)}
 
-/* Table */
-.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 1px 6px rgba(45,53,97,.07); }
-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-col.col-drag { width: 28px; } col.col-name { width: 44%; }
-col.col-cl { width: 17%; } col.col-real { width: 17%; } col.col-diff { width: 14%; } col.col-flag { width: 28px; } col.col-act { width: 28px; }
-thead th { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); padding: 11px 12px 9px; text-align: left; background: #f7f8fc; border-bottom: 1px solid var(--border); white-space: nowrap; }
-thead th.r { text-align: right; }
-thead th.col-kat-th { display: none; }
-tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
-tbody tr:last-child { border-bottom: none; }
-tbody tr:hover { background: #fafaf8; }
-tbody tr.dragging { opacity: .35; background: var(--accent-light); }
-tbody tr.drag-over-top { box-shadow: inset 0 2px 0 var(--accent); }
-tbody td { padding: 0; vertical-align: middle; }
-tbody td.td-kat { display: none !important; padding: 0 !important; width: 0 !important; max-width: 0 !important; overflow: hidden !important; border: none !important; }
-td.td-name { position: relative; overflow: hidden; }
-.name-dot { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 7px; height: 7px; border-radius: 50%; display: block; pointer-events: none; }
-.name-input { padding-left: 26px !important; box-sizing: border-box !important; width: 100% !important; }
-.kat-select-hidden { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; opacity: 0; cursor: pointer; border: none; padding: 0; }
-tr.kat-separator { background: none !important; }
-tr.kat-separator td { padding: 14px 12px 5px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); background: none; border-bottom: none; }
-tr.kat-separator:not(:first-child) td { border-top: 1px solid var(--border); padding-top: 16px; }
-.kat-sep-inner { display: flex; align-items: center; gap: 7px; }
-.kat-sep-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
-.drag-handle { width: 30px; display: flex; align-items: center; justify-content: center; cursor: grab; color: #d0cec7; padding: 10px 4px; transition: color .15s; }
-.drag-handle:active { cursor: grabbing; }
-tbody tr:hover .drag-handle { color: #aaa; }
-.kat-wrap { display: flex; align-items: center; padding: 0 8px; overflow: hidden; }
-.kat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-right: 6px; background: #ddd; }
-.kat-select { width: 100%; background: none; border: none; outline: none; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text); cursor: pointer; padding: 10px 2px 10px 0; appearance: none; -webkit-appearance: none; overflow: hidden; text-overflow: ellipsis; }
-.kat-select:focus { background: var(--accent-light); border-radius: 4px; }
-.cell-input { width: 100%; background: none; border: none; outline: none; font-family: 'DM Sans', sans-serif; font-size: 13.5px; color: var(--text); padding: 10px 12px; transition: background .15s; }
-.cell-input::placeholder { color: #c5c3bc; }
-.cell-input:focus { background: var(--accent-light); }
-.cell-input.mono { font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
-.diff-badge { display: block; text-align: right; padding: 10px 12px; font-size: 12px; font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.diff-badge.pos { color: var(--success); } .diff-badge.neg { color: var(--danger); }
-.diff-badge.zero { color: var(--text-muted); } .diff-badge.none { color: #d0cec7; }
-.btn-del { width: 30px; background: none; border: none; cursor: pointer; color: #ccc; padding: 8px 4px; display: flex; align-items: center; justify-content: center; border-radius: 6px; margin: auto; transition: all .15s; }
-.btn-del:hover { color: var(--danger); background: var(--danger-light); }
-.btn-flag { width: 30px; background: none; border: none; cursor: pointer; color: #ddd; padding: 8px 4px; display: flex; align-items: center; justify-content: center; border-radius: 6px; margin: auto; transition: all .15s; font-size: 15px; }
-.btn-flag:hover { color: #f59e0b; }
-.btn-flag.flagged { color: #ef4444; }
-tbody tr.flagged-row { background: #fff8f8; }
-tbody tr.flagged-row:hover { background: #fff1f1; }
-tbody tr.flagged-row td { border-bottom-color: #fecaca; }
-tfoot#tfoot tr { border-top: 2px solid var(--border-strong); }
-tfoot#tfoot td { padding: 10px 12px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; color: var(--text); white-space: nowrap; }
-tfoot#tfoot td.lbl { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); text-align: left; }
-tfoot#tfoot .tot-diff.pos { color: var(--success); } tfoot#tfoot .tot-diff.neg { color: var(--danger); }
-.btn-add-row { display: flex; align-items: center; gap: 7px; background: none; border: none; padding: 10px 14px; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--text-muted); cursor: pointer; width: 100%; transition: color .15s, background .15s; }
-.btn-add-row:hover { color: var(--accent); background: var(--accent-light); }
-.empty { text-align: center; padding: 48px 24px; color: var(--text-muted); }
-.empty-icon { font-size: 32px; margin-bottom: 12px; opacity: .35; }
-.empty p { font-size: 13px; margin-bottom: 16px; }
-.btn-copy-prev { display: inline-flex; align-items: center; gap: 7px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 8px 16px; font-size: 13px; font-weight: 500; font-family: 'DM Sans', sans-serif; color: var(--text); cursor: pointer; transition: all .15s; }
-.btn-copy-prev:hover { border-color: var(--accent); color: var(--accent); }
-.loading { text-align: center; padding: 48px; color: var(--text-muted); font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
-@keyframes spin { to { transform: rotate(360deg); } }
-#toast { position: fixed; bottom: 24px; right: 24px; background: #2d3561; color: #fff; font-size: 13px; padding: 10px 16px; border-radius: var(--radius); opacity: 0; transform: translateY(8px); transition: all .2s; pointer-events: none; z-index: 999; }
-#toast.show { opacity: 1; transform: translateY(0); } #toast.err { background: var(--danger); }
+/* Table wrapper */
+.twrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;box-shadow:0 1px 6px rgba(45,53,97,.07)}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+colgroup col:nth-child(1){width:28px}   /* drag */
+colgroup col:nth-child(2){width:40%}    /* name */
+colgroup col:nth-child(3){width:17%}    /* cl */
+colgroup col:nth-child(4){width:17%}    /* real */
+colgroup col:nth-child(5){width:14%}    /* diff */
+colgroup col:nth-child(6){width:28px}   /* flag */
+colgroup col:nth-child(7){width:28px}   /* del */
+
+thead th{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:10px 12px 9px;text-align:left;background:#f7f8fc;border-bottom:1px solid var(--border);white-space:nowrap}
+thead th.r{text-align:right}
+
+/* Body rows */
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:#fafafd}
+tbody tr.flagged{background:#fdf5f5}
+tbody tr.flagged:hover{background:#fdf0ef}
+tbody tr.dragging{opacity:.3}
+tbody tr.over{box-shadow:inset 0 -2px 0 var(--accent)}
+tbody td{padding:0;vertical-align:middle}
+
+/* Drag handle */
+.dh{width:28px;display:flex;align-items:center;justify-content:center;cursor:grab;color:#d5d8e8;padding:10px 4px;transition:color .15s}
+.dh:active{cursor:grabbing}
+tr:hover .dh{color:#aab}
+
+/* Name cell */
+.ncell{position:relative;display:flex;align-items:center}
+.ndot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin:0 8px 0 12px;cursor:pointer;transition:transform .15s}
+.ndot:hover{transform:scale(1.4)}
+.ninput{flex:1;min-width:0;background:none;border:none;outline:none;font-family:inherit;font-size:13.5px;color:var(--text);padding:10px 10px 10px 0;transition:background .15s}
+.ninput::placeholder{color:#c5c8dc}
+.ninput:focus{background:var(--accent-light)}
+
+/* Kat popup */
+.kat-popup{position:absolute;left:4px;top:100%;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:0 4px 16px rgba(0,0,0,.12);padding:6px;min-width:180px;display:none}
+.kat-popup.open{display:block}
+.kat-opt{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px;transition:background .1s}
+.kat-opt:hover{background:var(--accent-light)}
+.kat-opt-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* Number inputs */
+.ninr{width:100%;background:none;border:none;outline:none;font-family:inherit;font-size:13px;font-variant-numeric:tabular-nums;color:var(--text);padding:10px 12px;text-align:right;transition:background .15s}
+.ninr::placeholder{color:#c5c8dc}
+.ninr:focus{background:var(--accent-light)}
+
+/* Diff badge */
+.dbadge{display:block;text-align:right;padding:10px 12px;font-size:12px;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+.dbadge.pos{color:var(--ok)}.dbadge.neg{color:var(--err)}.dbadge.zero{color:var(--muted)}.dbadge.none{color:#d5d8e8}
+
+/* Action buttons */
+.fbtn,.dbtn{width:28px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;margin:auto;padding:6px 4px;transition:all .15s}
+.fbtn{color:#d5d8e8;font-size:13px;font-weight:700}
+.fbtn:hover{color:#f59e0b}.fbtn.on{color:var(--err)}
+.dbtn{color:#d5d8e8}
+.dbtn:hover{color:var(--err);background:var(--err-light)}
+
+/* Kat separator */
+tr.katsep td{padding:14px 12px 5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);border-bottom:none}
+tr.katsep:not(:first-child) td{border-top:1px solid var(--border);padding-top:16px}
+.ksi{display:flex;align-items:center;gap:7px}
+.ksd{width:6px;height:6px;border-radius:50%;display:inline-block}
+
+/* Add row button */
+.addbtn{display:flex;align-items:center;gap:7px;background:none;border:none;padding:10px 14px;font-size:13px;font-family:inherit;color:var(--muted);cursor:pointer;width:100%;transition:color .15s,background .15s}
+.addbtn:hover{color:var(--accent);background:var(--accent-light)}
+
+/* Tfoot totals */
+tfoot#tf tr{border-top:2px solid var(--border-strong)}
+tfoot#tf td{padding:10px 12px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right;color:var(--navy);white-space:nowrap}
+tfoot#tf td.lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);text-align:left}
+tfoot#tf .tp{color:var(--ok)}.tfoot#tf .tn{color:var(--err)}
+
+/* Empty */
+.empty{text-align:center;padding:48px 24px;color:var(--muted)}
+.empty-icon{font-size:32px;margin-bottom:12px;opacity:.3}
+.empty p{font-size:13px;margin-bottom:16px}
+.cpbtn{display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r);padding:8px 16px;font-size:13px;font-weight:500;font-family:inherit;color:var(--text);cursor:pointer;transition:all .15s}
+.cpbtn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light)}
+
+/* Loading */
+.loading{text-align:center;padding:48px;color:var(--muted);font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px}
+.spin{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;flex-shrink:0}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* Toast */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;font-size:13px;padding:10px 16px;border-radius:var(--r);opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;z-index:999}
+#toast.on{opacity:1;transform:translateY(0)}.#toast.err{background:var(--err)}
 
 /* Analytics */
-.analytics-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
-.analytics-header { display: grid; grid-template-columns: 1fr auto auto auto; gap: 0 8px; align-items: center; padding: 11px 16px 9px; background: var(--bg); border-bottom: 1px solid var(--border); }
-.analytics-header span { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
-.analytics-header span.r { text-align: right; min-width: 100px; }
-.kat-row { display: grid; grid-template-columns: 12px 1fr auto auto auto; gap: 0 10px; align-items: center; padding: 9px 16px; border-bottom: 1px solid var(--border); }
-.kat-row:last-child { border-bottom: none; }
-.kat-row:hover { background: #fafaf8; }
-.kat-row-dot { width: 8px; height: 8px; border-radius: 50%; }
-.kat-row-name { font-size: 13px; }
-.kat-row-cl { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 100px; text-align: right; }
-.kat-row-real { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 100px; text-align: right; }
-.kat-row-diff { font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 80px; text-align: right; }
-.kat-row-diff.pos { color: var(--success); } .kat-row-diff.neg { color: var(--danger); }
-.bar-row { padding: 0 16px 8px; border-bottom: 1px solid var(--border); }
-.bar-row:last-of-type { border-bottom: none; }
-.bar-track { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
-.bar-fill { height: 100%; border-radius: 2px; transition: width .5s ease; }
-.no-data { text-align: center; padding: 40px; color: var(--text-muted); font-size: 13px; }
-.analytics-total { display: grid; grid-template-columns: 12px 1fr auto auto auto; gap: 0 10px; align-items: center; padding: 10px 16px; border-top: 2px solid var(--border-strong); }
-.analytics-total span { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.analytics-total span.lbl { color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
-.analytics-total span.r { text-align: right; white-space: nowrap; min-width: 100px; }
-.analytics-total span.rd { text-align: right; white-space: nowrap; min-width: 80px; }
-.analytics-total span.pos { color: var(--success); } .analytics-total span.neg { color: var(--danger); }
-
-@media (max-width: 640px) {
-  main { padding: 16px; } header { padding: 0 16px; } .summary { grid-template-columns: 1fr; }
-}
+.awrap{display:flex;flex-direction:column;gap:12px}
+.a-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;box-shadow:0 1px 6px rgba(45,53,97,.07)}
+.a-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:14px 18px 8px}
+.arow{display:flex;align-items:center;gap:12px;padding:10px 18px;border-top:1px solid var(--border);transition:background .1s}
+.arow:hover{background:#fafafd}
+.ardot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.arname{flex:1;font-size:13.5px;color:var(--text);min-width:0}
+.arvals{display:flex;align-items:center;gap:20px;flex-shrink:0}
+.arcl{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;min-width:110px;text-align:right}
+.arreal{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:110px;text-align:right;color:var(--navy)}
+.ardiff{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:90px;text-align:right}
+.ardiff.pos{color:var(--ok)}.ardiff.neg{color:var(--err)}.ardiff.zero{color:var(--muted)}
+.abar{height:3px;background:var(--border);border-radius:2px;margin:0 18px 10px;overflow:hidden}
+.abfill{height:100%;border-radius:2px;transition:width .6s ease}
+.atot-row{display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:2px solid var(--border-strong);background:#f7f8fc}
+.atot-row .arname{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.atot-row .arcl{font-weight:700;color:var(--navy)}
+.atot-row .arreal{font-size:14px;color:var(--navy)}
+.atot-row .ardiff{font-size:13px}
+.nodata{text-align:center;padding:40px;color:var(--muted);font-size:13px}
 </style>
 </head>
 <body>
 
 <header>
   <div class="logo"><div class="logo-dot"></div>Provozní náklady</div>
-  <div class="header-right">
-    <div class="status-dot" id="status-dot"></div>
-    <span class="status-label" id="status-label">Připojování…</span>
+  <div class="hdr-right">
+    <div class="sdot" id="sdot"></div>
+    <span class="slbl" id="slbl">Připojování…</span>
   </div>
 </header>
 
 <main>
-  <div class="page-title">Přehled nákladů</div>
-  <div class="page-sub">Porovnání evidovaných nákladů v Costlocker vs. reálně zaplaceno</div>
+  <div class="ttl">Přehled nákladů</div>
+  <div class="sub">Porovnání evidovaných nákladů v Costlocker vs. reálně zaplaceno</div>
 
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('prehled',this)">Přehled</button>
-    <button class="tab-btn" onclick="switchTab('analytika',this)">Analytika</button>
+    <button class="tab on" onclick="switchTab('p',this)">Přehled</button>
+    <button class="tab" onclick="switchTab('a',this)">Analytika</button>
   </div>
 
-  <div class="month-bar">
-    <div class="month-nav">
-      <button class="btn-month" onclick="changeMonth(-1)">&#8249;</button>
-      <span class="month-label" id="month-label">—</span>
-      <button class="btn-month" onclick="changeMonth(1)">&#8250;</button>
+  <div class="mbar">
+    <div class="mnav">
+      <button class="mbtn" onclick="chMonth(-1)">&#8249;</button>
+      <span class="mlbl" id="mlbl">—</span>
+      <button class="mbtn" onclick="chMonth(1)">&#8250;</button>
     </div>
   </div>
 
-  <div class="summary-wrap">
-    <div class="summary">
-      <div class="card"><div class="card-label">Evidováno v CL</div><div class="card-value" id="sum-cl">—</div></div>
-      <div class="card"><div class="card-label">Realita</div><div class="card-value" id="sum-real">—</div></div>
-      <div class="card"><div class="card-label">Rozdíl</div><div class="card-value" id="sum-diff">—</div></div>
+  <div class="swrap">
+    <div class="scards">
+      <div class="sc"><div class="sc-lbl">Evidováno v CL</div><div class="sc-val" id="scl">—</div></div>
+      <div class="sc"><div class="sc-lbl">Realita</div><div class="sc-val" id="srl">—</div></div>
+      <div class="sc"><div class="sc-lbl">Rozdíl</div><div class="sc-val" id="sdl">—</div></div>
     </div>
   </div>
 
-  <div class="tab-pane active" id="tab-prehled">
-    <div class="table-wrap">
+  <div class="pane on" id="pane-p">
+    <div class="twrap">
       <table>
-        <colgroup>
-          <col class="col-drag"><col class="col-name">
-          <col class="col-cl"><col class="col-real"><col class="col-diff"><col class="col-flag"><col class="col-act">
-        </colgroup>
+        <colgroup><col><col><col><col><col><col><col></colgroup>
         <thead>
           <tr>
             <th></th><th>Položka</th>
-            <th class="r">CL</th><th class="r">Realita</th><th class="r">Rozdíl</th><th></th><th></th>
+            <th class="r">CL</th><th class="r">Realita</th><th class="r">Rozdíl</th>
+            <th></th><th></th>
           </tr>
         </thead>
         <tbody id="tbody">
-          <tr><td colspan="7"><div class="loading"><div class="spinner"></div> Načítám data…</div></td></tr>
+          <tr><td colspan="7"><div class="loading"><div class="spin"></div>Načítám…</div></td></tr>
         </tbody>
-        <tfoot id="tfoot"></tfoot>
-        <tfoot id="tfoot-add">
-          <tr><td colspan="7">
-            <button class="btn-add-row" id="btn-add" onclick="addRow()">
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-              Přidat položku
-            </button>
-          </td></tr>
-        </tfoot>
+        <tfoot id="tf"></tfoot>
+        <tfoot><tr><td colspan="7">
+          <button class="addbtn" onclick="addRow(null)">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            Přidat položku
+          </button>
+        </td></tr></tfoot>
       </table>
     </div>
   </div>
 
-  <div class="tab-pane" id="tab-analytika">
-    <div id="analytics-content"><div class="loading"><div class="spinner"></div> Načítám…</div></div>
+  <div class="pane" id="pane-a">
+    <div id="acontent"><div class="loading"><div class="spin"></div>Načítám…</div></div>
   </div>
 </main>
 
 <div id="toast"></div>
+<div id="katpopup" class="kat-popup"></div>
 
 <script>
-const SUPABASE_URL = 'https://pcrzjvqpjktpotczdrxj.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjcnpqdnFwamt0cG90Y3pkcnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0OTA5MTAsImV4cCI6MjA5NDA2NjkxMH0.YVKmxQUmPFhGx2ffhBDdcc8U-p2JJebesIvMZWCpFAQ';
-const TABLE = 'polozky';
-const MONTHS = ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
-const KATEGORIE = ['Mzdy','Specialisté','Odvody','Nájemné','Software','Doprava','Služby','Provoz kanceláře','Zdraví & benefity','Jídlo','Vzdělávání','Marketing','Hardware','Účetnictví','Ostatní'];
-const KAT_COLORS = {'Mzdy':'#6366f1','Specialisté':'#8b5cf6','Odvody':'#f59e0b','Nájemné':'#10b981','Software':'#0ea5e9','Doprava':'#f97316','Služby':'#ec4899','Provoz kanceláře':'#64748b','Zdraví & benefity':'#22c55e','Jídlo':'#ef4444','Vzdělávání':'#a855f7','Marketing':'#06b6d4','Hardware':'#84cc16','Účetnictví':'#78716c','Ostatní':'#94a3b8'};
+const URL = 'https://pcrzjvqpjktpotczdrxj.supabase.co';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjcnpqdnFwamt0cG90Y3pkcnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0OTA5MTAsImV4cCI6MjA5NDA2NjkxMH0.YVKmxQUmPFhGx2ffhBDdcc8U-p2JJebesIvMZWCpFAQ';
+const TBL = 'polozky';
+const MNS = ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
+const KATS = ['Mzdy','Specialisté','Odvody','Nájemné','Software','Doprava','Služby','Provoz kanceláře','Zdraví & benefity','Jídlo','Vzdělávání','Marketing','Hardware','Účetnictví','Ostatní'];
+const KCOL = {'Mzdy':'#6366f1','Specialisté':'#8b5cf6','Odvody':'#f59e0b','Nájemné':'#10b981','Software':'#0ea5e9','Doprava':'#f97316','Služby':'#ec4899','Provoz kanceláře':'#64748b','Zdraví & benefity':'#22c55e','Jídlo':'#ef4444','Vzdělávání':'#a855f7','Marketing':'#06b6d4','Hardware':'#84cc16','Účetnictví':'#78716c','Ostatní':'#94a3b8'};
 
-let cur = new Date(), rows = [], saveTimers = {}, activeTab = 'prehled';
+let cur = new Date(), rows = [], timers = {}, activeTab = 'p', dragId = null;
 
-function monthKey() { return `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`; }
-function monthDisplay() { return `${MONTHS[cur.getMonth()]} ${cur.getFullYear()}`; }
+const mk = () => `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
+const md = () => `${MNS[cur.getMonth()]} ${cur.getFullYear()}`;
 
-async function apiGet(mesic) {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?mesic=eq.${mesic}&order=poradi.asc,created_at.asc`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
-  if (!r.ok) throw new Error(await r.text()); return r.json();
+// API
+const hdr = {'apikey':KEY,'Authorization':`Bearer ${KEY}`,'Content-Type':'application/json'};
+async function get(m) {
+  const r = await fetch(`${URL}/rest/v1/${TBL}?mesic=eq.${m}&order=poradi.asc,created_at.asc`,{headers:hdr});
+  if(!r.ok) throw new Error(await r.text()); return r.json();
 }
-async function apiInsert(row) {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, { method:'POST', headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json',Prefer:'return=representation'}, body:JSON.stringify(row) });
-  if (!r.ok) throw new Error(await r.text()); return (await r.json())[0];
+async function ins(d) {
+  const r = await fetch(`${URL}/rest/v1/${TBL}`,{method:'POST',headers:{...hdr,Prefer:'return=representation'},body:JSON.stringify(d)});
+  if(!r.ok) throw new Error(await r.text()); return (await r.json())[0];
 }
-async function apiUpdate(id, patch) {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, { method:'PATCH', headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'}, body:JSON.stringify(patch) });
-  if (!r.ok) throw new Error(await r.text());
+async function upd(id,d) {
+  const r = await fetch(`${URL}/rest/v1/${TBL}?id=eq.${id}`,{method:'PATCH',headers:hdr,body:JSON.stringify(d)});
+  if(!r.ok) throw new Error(await r.text());
 }
-async function apiDelete(id) {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, { method:'DELETE', headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`} });
-  if (!r.ok) throw new Error(await r.text());
-}
-
-function setStatus(ok) { document.getElementById('status-dot').className='status-dot '+(ok?'ok':'err'); document.getElementById('status-label').textContent=ok?'Připojeno':'Chyba připojení'; }
-let toastTimer;
-function toast(msg,isErr=false) { const el=document.getElementById('toast'); el.textContent=msg; el.className='show'+(isErr?' err':''); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.className='',2800); }
-function fmt(n) { if(n===null||n===undefined||n==='') return null; const v=parseFloat(String(n).replace(',','.').replace(/\s/g,'')); return isNaN(v)?null:v; }
-function fmtDisplay(n) { if(n===null||n===undefined) return '—'; return n.toLocaleString('cs-CZ',{minimumFractionDigits:2,maximumFractionDigits:2})+' Kč'; }
-function diffClass(cl,re) { if(cl===null||re===null) return 'none'; const d=re-cl; if(Math.abs(d)<0.01) return 'zero'; return d<0?'pos':'neg'; }
-function diffText(cl,re) { if(cl===null||re===null) return '—'; const d=re-cl; return (d>0?'+':'')+fmtDisplay(d); }
-function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-function clearSummary() { ['sum-cl','sum-real','sum-diff'].forEach(id=>document.getElementById(id).textContent='—'); document.getElementById('sum-diff').className='card-value'; }
-function updateSummary() {
-  let sumCL=0,sumR=0,hasCL=false,hasR=false;
-  rows.forEach(r=>{const cl=fmt(r.cl_castka),re=fmt(r.real_castka); if(cl!==null){sumCL+=cl;hasCL=true;} if(re!==null){sumR+=re;hasR=true;}});
-  document.getElementById('sum-cl').textContent=hasCL?fmtDisplay(sumCL):'—';
-  document.getElementById('sum-real').textContent=hasR?fmtDisplay(sumR):'—';
-  const el=document.getElementById('sum-diff');
-  if(hasCL&&hasR){const d=sumR-sumCL; el.textContent=(d>0?'+':'')+fmtDisplay(d); el.className='card-value '+(Math.abs(d)<0.01?'':d<0?'success':'danger');}
-  else{el.textContent='—';el.className='card-value';}
-}
-function updateTfoot() {
-  let sumCL=0,sumR=0,hasCL=false,hasR=false;
-  rows.forEach(r=>{const cl=fmt(r.cl_castka),re=fmt(r.real_castka); if(cl!==null){sumCL+=cl;hasCL=true;} if(re!==null){sumR+=re;hasR=true;}});
-  const d=hasCL&&hasR?sumR-sumCL:null, dc=d===null?'':Math.abs(d)<0.01?'':d<0?'pos':'neg';
-  const tf=document.getElementById('tfoot');
-  if(tf) tf.innerHTML=`<tr><td class="lbl" colspan="2">Celkem</td><td>${hasCL?fmtDisplay(sumCL):'—'}</td><td>${hasR?fmtDisplay(sumR):'—'}</td><td class="tot-diff ${dc}">${d!==null?(d>0?'+':'')+fmtDisplay(d):'—'}</td><td></td><td></td></tr>`;
+async function del(id) {
+  const r = await fetch(`${URL}/rest/v1/${TBL}?id=eq.${id}`,{method:'DELETE',headers:hdr});
+  if(!r.ok) throw new Error(await r.text());
 }
 
+// Helpers
+function setStatus(ok) {
+  document.getElementById('sdot').className='sdot '+(ok?'ok':'err');
+  document.getElementById('slbl').textContent=ok?'Připojeno':'Chyba';
+}
+let tt;
+function toast(m,err=false) {
+  const el=document.getElementById('toast');
+  el.textContent=m; el.className='on'+(err?' err':'');
+  clearTimeout(tt); tt=setTimeout(()=>el.className='',2800);
+}
+function fmtN(n) {
+  if(n===null||n===undefined||n==='') return null;
+  const v=parseFloat(String(n).replace(',','.').replace(/\s/g,''));
+  return isNaN(v)?null:v;
+}
+function fmtD(n) {
+  if(n===null||n===undefined) return '—';
+  return n.toLocaleString('cs-CZ',{minimumFractionDigits:2,maximumFractionDigits:2})+' Kč';
+}
+function dc(cl,re) { if(cl===null||re===null) return 'none'; const d=re-cl; if(Math.abs(d)<.01) return 'zero'; return d<0?'pos':'neg'; }
+function dt(cl,re) { if(cl===null||re===null) return '—'; const d=re-cl; return (d>0?'+':'')+fmtD(d); }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function kcolor(k) { return KCOL[k]||'#c8cbdc'; }
+
+// Summary
+function clearSum() { ['scl','srl','sdl'].forEach(id=>document.getElementById(id).textContent='—'); document.getElementById('sdl').className='sc-val'; }
+function updSum() {
+  let cl=0,re=0,hc=false,hr=false;
+  rows.forEach(r=>{const c=fmtN(r.cl_castka),v=fmtN(r.real_castka); if(c!==null){cl+=c;hc=true;} if(v!==null){re+=v;hr=true;}});
+  document.getElementById('scl').textContent=hc?fmtD(cl):'—';
+  document.getElementById('srl').textContent=hr?fmtD(re):'—';
+  const el=document.getElementById('sdl');
+  if(hc&&hr){const d=re-cl;el.textContent=(d>0?'+':'')+fmtD(d);el.className='sc-val '+(Math.abs(d)<.01?'':d<0?'ok':'err');}
+  else{el.textContent='—';el.className='sc-val';}
+}
+function updTf() {
+  let cl=0,re=0,hc=false,hr=false;
+  rows.forEach(r=>{const c=fmtN(r.cl_castka),v=fmtN(r.real_castka); if(c!==null){cl+=c;hc=true;} if(v!==null){re+=v;hr=true;}});
+  const d=hc&&hr?re-cl:null,dc2=d===null?'':Math.abs(d)<.01?'':d<0?'tp':'tn';
+  const tf=document.getElementById('tf');
+  if(tf) tf.innerHTML=`<tr><td class="lbl" colspan="2">Celkem</td><td>${hc?fmtD(cl):'—'}</td><td>${hr?fmtD(re):'—'}</td><td class="${dc2}">${d!==null?(d>0?'+':'')+fmtD(d):'—'}</td><td></td><td></td></tr>`;
+}
+
+// Render
 function render() {
-  const tb=document.getElementById('tbody');
+  const tb = document.getElementById('tbody');
   if(!rows.length) {
-    tb.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><p>Žádné položky pro tento měsíc.</p><button class="btn-copy-prev" onclick="copyFromPrevMonth()"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h7a2 2 0 0 1 2 2v5M2 4l2-2M2 4l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Zkopírovat z předchozího měsíce</button></div></td></tr>`;
-    document.getElementById('tfoot').innerHTML=''; clearSummary(); return;
+    tb.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><p>Žádné položky pro tento měsíc.</p><button class="cpbtn" onclick="copyPrev()"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 4h7a2 2 0 0 1 2 2v5M2 4l2-2M2 4l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Zkopírovat z předchozího měsíce</button></div></td></tr>`;
+    document.getElementById('tf').innerHTML=''; clearSum(); return;
   }
 
-  // Seřadit podle kategorie, bez kategorie na konec
-  const katOrder = KATEGORIE.reduce((acc,k,i)=>{acc[k]=i;return acc;},{});
+  // Sort by category
+  const katOrd = KATS.reduce((a,k,i)=>{a[k]=i;return a;},{});
   const sorted = [...rows].sort((a,b)=>{
     const ka=a.kategorie||'', kb=b.kategorie||'';
-    if(!ka&&kb) return 1; if(ka&&!kb) return -1; if(!ka&&!kb) return 0;
-    const oa=katOrder[ka]??99, ob=katOrder[kb]??99;
+    if(!ka&&kb) return 1; if(ka&&!kb) return -1;
+    const oa=katOrd[ka]??99, ob=katOrd[kb]??99;
     if(oa!==ob) return oa-ob;
     return (a.poradi??0)-(b.poradi??0);
   });
 
-  let lastKat=null;
-  tb.innerHTML=sorted.map((r,i)=>{
-    const cl=fmt(r.cl_castka),re=fmt(r.real_castka),dc=diffClass(cl,re),dt=diffText(cl,re);
-    const clDisp=cl!==null?fmtDisplay(cl):'',reDisp=re!==null?fmtDisplay(re):'';
-    const clRaw=cl!==null?cl:'',reRaw=re!==null?re:'';
-    const kat=r.kategorie||'',katColor=KAT_COLORS[kat]||'#ddd';
-    const isLast=i===sorted.length-1,enter=isLast?'onkeydown="handleEnter(event)"':'';
-    const flagged=r.priznak?true:false;
-    const origIdx=rows.findIndex(x=>x.id===r.id);
+  let lastKat = null;
+  let html = '';
 
-    let separator='';
-    if(kat!==lastKat && kat) {
-      separator=`<tr class="kat-separator"><td colspan="7"><div class="kat-sep-inner"><span class="kat-sep-dot" style="background:${katColor}"></span>${escHtml(kat)}</div></td></tr>`;
-    } else if(!kat && lastKat!==null && lastKat!=='') {
-      separator=`<tr class="kat-separator"><td colspan="7"><div class="kat-sep-inner"><span class="kat-sep-dot" style="background:#ccc"></span>Bez kategorie</div></td></tr>`;
+  sorted.forEach((r,i) => {
+    const cl=fmtN(r.cl_castka), re=fmtN(r.real_castka);
+    const kat=r.kategorie||'', kc=kcolor(kat);
+    const flag=!!r.priznak;
+    const clD=cl!==null?fmtD(cl):'', reD=re!==null?fmtD(re):'';
+    const clR=cl!==null?cl:'', reR=re!==null?re:'';
+
+    // Category separator
+    if(kat!==lastKat) {
+      const sepKat = kat||'Bez kategorie';
+      const sepC = kat?kc:'#c8cbdc';
+      const borderTop = lastKat!==null?'border-top:1px solid var(--border);':'';
+      html += `<tr class="katsep"><td colspan="7" style="${borderTop}"><div class="ksi"><span class="ksd" style="background:${sepC}"></span>${esc(sepKat)}</div></td></tr>`;
+      lastKat = kat;
     }
-    lastKat=kat;
 
-    return separator+`<tr draggable="true" data-id="${r.id}" data-idx="${origIdx}" class="${flagged?'flagged-row':''}" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)">
-      <td><div class="drag-handle" title="Přetáhnout pro přeřazení"><svg width="10" height="16" viewBox="0 0 10 16" fill="none"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div></td>
-      <td class="td-name"><span class="name-dot" style="background:${katColor}"></span><input class="cell-input name-input" type="text" value="${escHtml(r.nazev)}" placeholder="Název položky…" data-field="nazev" data-id="${r.id}" oninput="schedSave(this)" ${enter}><select class="kat-select-hidden" data-id="${r.id}" onchange="saveKat(this)" title="Změnit kategorii"><option value="">—</option>${KATEGORIE.map(k=>`<option value="${escHtml(k)}"${k===kat?' selected':''}>${escHtml(k)}</option>`).join('')}</select></td>
-      <td><input class="cell-input mono" type="text" value="${clDisp}" data-raw="${clRaw}" placeholder="0,00" data-field="cl_castka" data-id="${r.id}" oninput="schedSave(this)" onfocus="switchToRaw(this)" onblur="switchToFormatted(this)" ${enter}></td>
-      <td><input class="cell-input mono" type="text" value="${reDisp}" data-raw="${reRaw}" placeholder="0,00" data-field="real_castka" data-id="${r.id}" oninput="schedSave(this)" onfocus="switchToRaw(this)" onblur="switchToFormatted(this)" ${enter}></td>
-      <td><span class="diff-badge ${dc}" id="diff-${r.id}">${dt}</span></td>
-      <td><button class="btn-flag${flagged?' flagged':''}" onclick="toggleFlag('${r.id}')" title="${flagged?'Odznačit':'Označit jako problém'}">!</button></td>
-      <td><button class="btn-del" onclick="deleteRow('${r.id}')" title="Smazat"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M3.5 3.5l.7 7.5a.5.5 0 0 0 .5.5h4.6a.5.5 0 0 0 .5-.5l.7-7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button></td>
+    html += `<tr data-id="${r.id}" class="${flag?'flagged':''}"
+      draggable="true"
+      ondragstart="dstart(event,'${r.id}')"
+      ondragover="dover(event)"
+      ondrop="ddrop(event,'${r.id}')"
+      ondragend="dend(event)">
+      <td><div class="dh"><svg width="10" height="16" viewBox="0 0 10 16" fill="none"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div></td>
+      <td><div class="ncell"><span class="ndot" style="background:${kc}" onclick="openKat(event,'${r.id}')" title="Změnit kategorii"></span><input class="ninput" type="text" value="${esc(r.nazev)}" placeholder="Název…" data-id="${r.id}" data-f="nazev" oninput="save(this)" onkeydown="onkey(event,'${r.id}')"></div></td>
+      <td><input class="ninr" type="text" value="${clD}" data-raw="${clR}" placeholder="0,00" data-id="${r.id}" data-f="cl_castka" oninput="save(this)" onfocus="toRaw(this)" onblur="toFmt(this)" onkeydown="onkey(event,'${r.id}')"></td>
+      <td><input class="ninr" type="text" value="${reD}" data-raw="${reR}" placeholder="0,00" data-id="${r.id}" data-f="real_castka" oninput="save(this)" onfocus="toRaw(this)" onblur="toFmt(this)" onkeydown="onkey(event,'${r.id}')"></td>
+      <td><span class="dbadge ${dc(cl,re)}" id="db-${r.id}">${dt(cl,re)}</span></td>
+      <td><button class="fbtn${flag?' on':''}" onclick="toggleFlag('${r.id}')" title="Označit">!</button></td>
+      <td><button class="dbtn" onclick="delRow('${r.id}')" title="Smazat"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M3.5 3.5l.7 7.5a.5.5 0 0 0 .5.5h4.6a.5.5 0 0 0 .5-.5l.7-7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button></td>
     </tr>`;
-  }).join('');
-  updateTfoot(); updateSummary();
-  if(activeTab==='analytika') renderAnalytics();
+  });
+
+  tb.innerHTML = html;
+  updTf(); updSum();
+  if(activeTab==='a') renderA();
 }
 
+// Load
 async function load() {
-  document.getElementById('month-label').textContent=monthDisplay();
-  document.getElementById('tbody').innerHTML=`<tr><td colspan="7"><div class="loading"><div class="spinner"></div> Načítám…</div></td></tr>`;
-  document.getElementById('tfoot').innerHTML=''; clearSummary();
-  try { rows=await apiGet(monthKey()); setStatus(true); render(); }
-  catch(e) { setStatus(false); document.getElementById('tbody').innerHTML=`<tr><td colspan="7"><div class="loading" style="color:#b91c1c">Nepodařilo se načíst data.</div></td></tr>`; toast('Chyba: '+e.message,true); }
+  document.getElementById('mlbl').textContent=md();
+  document.getElementById('tbody').innerHTML=`<tr><td colspan="7"><div class="loading"><div class="spin"></div>Načítám…</div></td></tr>`;
+  document.getElementById('tf').innerHTML=''; clearSum();
+  try { rows=await get(mk()); setStatus(true); render(); }
+  catch(e) { setStatus(false); document.getElementById('tbody').innerHTML=`<tr><td colspan="7"><div class="loading" style="color:var(--err)">Chyba načítání: ${e.message}</div></td></tr>`; }
 }
 
-function switchTab(tab,btn) {
-  activeTab=tab;
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('tab-'+tab).classList.add('active');
-  if(tab==='analytika') renderAnalytics();
+// Tabs
+function switchTab(t,btn) {
+  activeTab=t;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('pane-'+t).classList.add('on');
+  if(t==='a') renderA();
 }
 
-function renderAnalytics() {
-  const el=document.getElementById('analytics-content');
-  if(!rows.length){el.innerHTML='<div class="no-data">Žádné položky pro tento měsíc.</div>';return;}
-  const groups={};
+// Analytics
+function renderA() {
+  const el=document.getElementById('acontent');
+  if(!rows.length){el.innerHTML='<div class="nodata">Žádné položky.</div>';return;}
+
+  // Group by category
+  const g={};
   rows.forEach(r=>{
     const k=r.kategorie||'(bez kategorie)';
-    if(!groups[k]) groups[k]={cl:0,real:0,hasCL:false,hasR:false};
-    const cl=fmt(r.cl_castka),re=fmt(r.real_castka);
-    if(cl!==null){groups[k].cl+=cl;groups[k].hasCL=true;}
-    if(re!==null){groups[k].real+=re;groups[k].hasR=true;}
+    if(!g[k])g[k]={cl:0,re:0,hc:false,hr:false,flagged:0};
+    const c=fmtN(r.cl_castka),v=fmtN(r.real_castka);
+    if(c!==null){g[k].cl+=c;g[k].hc=true;}
+    if(v!==null){g[k].re+=v;g[k].hr=true;}
+    if(r.priznak) g[k].flagged++;
   });
-  const sorted=Object.entries(groups).sort((a,b)=>b[1].real-a[1].real);
-  const maxReal=Math.max(...sorted.map(([,v])=>v.real),1);
-  let totCL=0,totR=0,hasCL=false,hasR=false;
-  sorted.forEach(([,v])=>{if(v.hasCL){totCL+=v.cl;hasCL=true;}if(v.hasR){totR+=v.real;hasR=true;}});
-  const totD=hasCL&&hasR?totR-totCL:null,totDc=totD===null?'':Math.abs(totD)<0.01?'':totD<0?'pos':'neg';
 
-  const rowsHtml=sorted.map(([name,v])=>{
-    const color=KAT_COLORS[name]||'#94a3b8';
-    const d=v.hasCL&&v.hasR?v.real-v.cl:null,dc=d===null?'':Math.abs(d)<0.01?'':d<0?'pos':'neg';
-    const barW=maxReal>0?Math.round((v.real/maxReal)*100):0;
-    return `<div class="kat-row">
-      <span class="kat-row-dot" style="background:${color}"></span>
-      <span class="kat-row-name">${escHtml(name)}</span>
-      <span class="kat-row-cl">${v.hasCL?fmtDisplay(v.cl):'—'}</span>
-      <span class="kat-row-real">${v.hasR?fmtDisplay(v.real):'—'}</span>
-      <span class="kat-row-diff ${dc}">${d!==null?(d>0?'+':'')+fmtDisplay(d):'—'}</span>
-    </div>
-    <div class="bar-row"><div class="bar-track"><div class="bar-fill" style="width:${barW}%;background:${color}40;border-right:2px solid ${color}"></div></div></div>`;
-  }).join('');
+  const s=Object.entries(g).sort((a,b)=>b[1].re-a[1].re);
+  const mx=Math.max(...s.map(([,v])=>v.re),1);
+  let tc=0,tr2=0,hc=false,hr=false;
+  s.forEach(([,v])=>{if(v.hc){tc+=v.cl;hc=true;}if(v.hr){tr2+=v.re;hr=true;}});
+  const tdiff=hc&&hr?tr2-tc:null;
+  const tdc=tdiff===null?'':Math.abs(tdiff)<.01?'zero':tdiff<0?'pos':'neg';
 
-  el.innerHTML=`<div class="analytics-wrap">
-    <div class="analytics-header">
-      <span>Kategorie</span>
-      <span class="r">CL</span>
-      <span class="r">Realita</span>
-      <span class="r">Rozdíl</span>
-    </div>
-    ${rowsHtml}
-    <div class="analytics-total">
-      <span></span>
-      <span class="lbl">Celkem</span>
-      <span class="r">${hasCL?fmtDisplay(totCL):'—'}</span>
-      <span class="r">${hasR?fmtDisplay(totR):'—'}</span>
-      <span class="rd ${totDc}">${totD!==null?(totD>0?'+':'')+fmtDisplay(totD):'—'}</span>
+  // Flagged items
+  const flagged=rows.filter(r=>r.priznak);
+
+  let flagHtml='';
+  if(flagged.length) {
+    flagHtml=`<div class="a-section">
+      <div class="a-section-title">⚠ Vyžaduje pozornost (${flagged.length})</div>
+      ${flagged.map(r=>{
+        const kc=kcolor(r.kategorie||'');
+        const cl=fmtN(r.cl_castka),re=fmtN(r.real_castka);
+        const d=cl!==null&&re!==null?re-cl:null;
+        const dcc=d===null?'':Math.abs(d)<.01?'zero':d<0?'pos':'neg';
+        return `<div class="arow">
+          <span class="ardot" style="background:${kc}"></span>
+          <span class="arname">${esc(r.nazev||'—')}</span>
+          <div class="arvals">
+            <span class="arcl">${cl!==null?fmtD(cl):'—'}</span>
+            <span class="arreal">${re!==null?fmtD(re):'—'}</span>
+            <span class="ardiff ${dcc}">${d!==null?(d>0?'+':'')+fmtD(d):'—'}</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  // Categories
+  const katHtml=`<div class="a-section">
+    <div class="a-section-title">Náklady podle kategorie</div>
+    ${s.map(([n,v])=>{
+      const col=KCOL[n]||'#94a3b8';
+      const d=v.hc&&v.hr?v.re-v.cl:null;
+      const dcc=d===null?'':Math.abs(d)<.01?'zero':d<0?'pos':'neg';
+      const bw=Math.round((v.re/mx)*100);
+      return `<div class="arow">
+        <span class="ardot" style="background:${col}"></span>
+        <span class="arname">${esc(n)}</span>
+        <div class="arvals">
+          <span class="arcl">${v.hc?fmtD(v.cl):'—'}</span>
+          <span class="arreal">${v.hr?fmtD(v.re):'—'}</span>
+          <span class="ardiff ${dcc}">${d!==null?(d>0?'+':'')+fmtD(d):'—'}</span>
+        </div>
+      </div>
+      <div class="abar"><div class="abfill" style="width:${bw}%;background:${col}"></div></div>`;
+    }).join('')}
+    <div class="atot-row">
+      <span class="ardot" style="background:transparent"></span>
+      <span class="arname">Celkem</span>
+      <div class="arvals">
+        <span class="arcl">${hc?fmtD(tc):'—'}</span>
+        <span class="arreal">${hr?fmtD(tr2):'—'}</span>
+        <span class="ardiff ${tdc}">${tdiff!==null?(tdiff>0?'+':'')+fmtD(tdiff):'—'}</span>
+      </div>
     </div>
   </div>`;
+
+  el.innerHTML=`<div class="awrap">${flagHtml}${katHtml}</div>`;
 }
 
-/* Drag & Drop */
-let dragSrcIdx=null;
-function dragStart(e){dragSrcIdx=parseInt(e.currentTarget.dataset.idx);e.currentTarget.classList.add('dragging');e.dataTransfer.effectAllowed='move';}
-function dragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';document.querySelectorAll('#tbody tr').forEach(r=>r.classList.remove('drag-over-top'));e.currentTarget.classList.add('drag-over-top');}
-function dragEnd(e){document.querySelectorAll('#tbody tr').forEach(r=>{r.classList.remove('dragging');r.classList.remove('drag-over-top');});}
-async function dragDrop(e){
-  e.preventDefault();
-  const targetIdx=parseInt(e.currentTarget.dataset.idx);
-  document.querySelectorAll('#tbody tr').forEach(r=>r.classList.remove('drag-over-top'));
-  if(dragSrcIdx===null||dragSrcIdx===targetIdx){dragSrcIdx=null;return;}
-  const moved=rows.splice(dragSrcIdx,1)[0];
-  rows.splice(targetIdx,0,moved);
-  dragSrcIdx=null;
+// Category popup
+let activeKatId = null;
+function openKat(e, id) {
+  e.stopPropagation();
+  const pop = document.getElementById('katpopup');
+  activeKatId = id;
+  const row = rows.find(r=>r.id===id);
+  const cur2 = row?.kategorie||'';
+  pop.innerHTML = KATS.map(k=>`<div class="kat-opt" onclick="setKat('${id}','${k}')"><span class="kat-opt-dot" style="background:${KCOL[k]}"></span>${esc(k)}</div>`).join('')
+    + `<div class="kat-opt" onclick="setKat('${id}','')"><span class="kat-opt-dot" style="background:#c8cbdc"></span>— bez kategorie</div>`;
+  const dot = e.target;
+  const rect = dot.getBoundingClientRect();
+  pop.style.left = (rect.left + window.scrollX) + 'px';
+  pop.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+  pop.classList.add('open');
+}
+async function setKat(id, kat) {
+  document.getElementById('katpopup').classList.remove('open');
+  const row = rows.find(r=>r.id===id); if(!row) return;
+  row.kategorie = kat||null;
   render();
-  try{await Promise.all(rows.map((r,i)=>apiUpdate(r.id,{poradi:i})));}
-  catch(e){toast('Chyba při ukládání pořadí',true);}
+  try { await upd(id,{kategorie:kat||null}); } catch(e){ toast('Chyba ukládání',true); }
+}
+document.addEventListener('click', ()=>document.getElementById('katpopup').classList.remove('open'));
+
+// Enter key — adds new row
+function onkey(e, id) {
+  if(e.key==='Enter') { e.preventDefault(); addRow(id); }
 }
 
-/* Save */
-function schedSave(input){
-  const id=input.dataset.id,field=input.dataset.field,val=input.value;
-  if(field!=='nazev') input.dataset.raw=val;
+// Save
+function save(inp) {
+  const id=inp.dataset.id, f=inp.dataset.f, v=inp.value;
+  if(f!=='nazev') inp.dataset.raw=v;
   const row=rows.find(r=>r.id===id);
   if(row){
-    row[field]=field==='nazev'?val:(val===''?null:val);
-    const cl=fmt(row.cl_castka),re=fmt(row.real_castka),badge=document.getElementById('diff-'+id);
-    if(badge){badge.textContent=diffText(cl,re);badge.className='diff-badge '+diffClass(cl,re);}
-    updateSummary();updateTfoot();
+    row[f]=f==='nazev'?v:(v===''?null:v);
+    if(f!=='nazev'){
+      const cl=fmtN(row.cl_castka),re=fmtN(row.real_castka);
+      const b=document.getElementById('db-'+id);
+      if(b){b.textContent=dt(cl,re);b.className='dbadge '+dc(cl,re);}
+      updSum(); updTf();
+    }
   }
-  clearTimeout(saveTimers[id+field]);
-  saveTimers[id+field]=setTimeout(async()=>{
-    try{const patch={};if(field==='nazev')patch.nazev=val;else patch[field]=val===''?null:parseFloat(val.replace(',','.').replace(/\s/g,''))||null;await apiUpdate(id,patch);}
-    catch(e){toast('Chyba při ukládání',true);}
+  clearTimeout(timers[id+f]);
+  timers[id+f]=setTimeout(async()=>{
+    try{
+      const p={};
+      if(f==='nazev') p.nazev=v;
+      else p[f]=v===''?null:parseFloat(v.replace(',','.').replace(/\s/g,''))||null;
+      await upd(id,p);
+    }catch(e){toast('Chyba ukládání',true);}
   },600);
 }
-async function saveKat(select){
-  const id=select.dataset.id,kat=select.value;
-  const row=rows.find(r=>r.id===id);if(row)row.kategorie=kat;
-  const dot=document.getElementById('dot-'+id);if(dot)dot.style.background=KAT_COLORS[kat]||'#ddd';
-  try{await apiUpdate(id,{kategorie:kat||null});}catch(e){toast('Chyba při ukládání kategorie',true);}
-}
-function switchToRaw(input){input.value=input.dataset.raw||'';input.select();}
-function switchToFormatted(input){const n=fmt(input.dataset.raw);input.value=n!==null?fmtDisplay(n):'';}
-function handleEnter(e){if(e.key==='Enter'){e.preventDefault();addRow();}}
+function toRaw(inp){inp.value=inp.dataset.raw||'';inp.select();}
+function toFmt(inp){const n=fmtN(inp.dataset.raw);inp.value=n!==null?fmtD(n):'';}
 
-async function addRow(){
-  const btn=document.getElementById('btn-add');if(btn)btn.disabled=true;
-  try{
-    const nr=await apiInsert({mesic:monthKey(),nazev:'',cl_castka:null,real_castka:null,kategorie:null,poradi:rows.length});
-    rows.push(nr);render();
-    setTimeout(()=>{const inputs=document.querySelectorAll('#tbody input[data-field="nazev"]');if(inputs.length)inputs[inputs.length-1].focus();},50);
-  }catch(e){toast('Nepodařilo se přidat položku',true);}
-  if(btn)btn.disabled=false;
+// Add row — optionally after specific id
+async function addRow(afterId) {
+  try {
+    // Find poradi for new row
+    let poradi = rows.length;
+    if(afterId) {
+      const idx = rows.findIndex(r=>r.id===afterId);
+      if(idx>=0) {
+        // Insert after this row, use same category
+        const afterRow = rows[idx];
+        const nr = await ins({mesic:mk(),nazev:'',cl_castka:null,real_castka:null,kategorie:afterRow.kategorie||null,poradi:idx+1});
+        rows.splice(idx+1,0,nr);
+        render();
+        setTimeout(()=>{const el=document.querySelector(`input[data-id="${nr.id}"][data-f="nazev"]`);if(el)el.focus();},50);
+        return;
+      }
+    }
+    const nr = await ins({mesic:mk(),nazev:'',cl_castka:null,real_castka:null,kategorie:null,poradi});
+    rows.push(nr); render();
+    setTimeout(()=>{const el=document.querySelector(`input[data-id="${nr.id}"][data-f="nazev"]`);if(el)el.focus();},50);
+  } catch(e){ toast('Chyba přidání',true); }
 }
-async function deleteRow(id){
-  if(!confirm('Smazat tuto položku?'))return;
-  try{await apiDelete(id);rows=rows.filter(r=>r.id!==id);render();toast('Položka smazána');}
-  catch(e){toast('Chyba při mazání',true);}
+
+// Delete
+async function delRow(id) {
+  if(!confirm('Smazat?')) return;
+  try { await del(id); rows=rows.filter(r=>r.id!==id); render(); toast('Smazáno'); }
+  catch(e){ toast('Chyba mazání',true); }
 }
-async function copyFromPrevMonth(){
-  const prev=new Date(cur.getFullYear(),cur.getMonth()-1,1);
-  const pk=`${prev.getFullYear()}-${String(prev.getMonth()+1).padStart(2,'0')}`;
-  try{
-    const pr=await apiGet(pk);
-    if(!pr.length){toast('Předchozí měsíc nemá žádné položky',true);return;}
-    for(let i=0;i<pr.length;i++){const r=pr[i];await apiInsert({mesic:monthKey(),nazev:r.nazev,cl_castka:r.cl_castka,real_castka:null,kategorie:r.kategorie||null,poradi:i});}
-    rows=await apiGet(monthKey());render();toast(`Zkopírováno ${pr.length} položek`);
-  }catch(e){toast('Chyba při kopírování',true);}
+
+// Flag
+async function toggleFlag(id) {
+  const row=rows.find(r=>r.id===id); if(!row) return;
+  row.priznak=!row.priznak;
+  const tr2=document.querySelector(`tr[data-id="${id}"]`);
+  const btn=tr2?.querySelector('.fbtn');
+  if(tr2) tr2.classList.toggle('flagged',row.priznak);
+  if(btn) btn.classList.toggle('on',row.priznak);
+  try{ await upd(id,{priznak:row.priznak}); }catch(e){ toast('Chyba',true); row.priznak=!row.priznak; }
 }
-async function toggleFlag(id){
-  const row=rows.find(r=>r.id===id);if(!row)return;
-  const newVal=!row.priznak;
-  row.priznak=newVal;
-  const tr=document.querySelector(`#tbody tr[data-id="${id}"]`);
-  const btn=tr?tr.querySelector('.btn-flag'):null;
-  if(tr){tr.classList.toggle('flagged-row',newVal);}
-  if(btn){btn.classList.toggle('flagged',newVal);btn.title=newVal?'Odznačit':'Označit jako problém';}
-  try{await apiUpdate(id,{priznak:newVal});}
-  catch(e){toast('Chyba při ukládání příznaku',true);row.priznak=!newVal;}
+
+// Drag & drop
+function dstart(e,id) {
+  dragId=id;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed='move';
 }
-function changeMonth(d){cur=new Date(cur.getFullYear(),cur.getMonth()+d,1);load();}
+function dover(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  document.querySelectorAll('#tbody tr[data-id]').forEach(r=>r.classList.remove('over'));
+  e.currentTarget.closest('tr[data-id]')?.classList.add('over');
+}
+function dend(e) {
+  document.querySelectorAll('#tbody tr').forEach(r=>{r.classList.remove('dragging');r.classList.remove('over');});
+}
+async function ddrop(e,targetId) {
+  e.preventDefault();
+  document.querySelectorAll('#tbody tr').forEach(r=>{r.classList.remove('dragging');r.classList.remove('over');});
+  if(!dragId||dragId===targetId){dragId=null;return;}
+  const si=rows.findIndex(r=>r.id===dragId);
+  const ti=rows.findIndex(r=>r.id===targetId);
+  if(si<0||ti<0){dragId=null;return;}
+  const [moved]=rows.splice(si,1);
+  rows.splice(ti,0,moved);
+  dragId=null;
+  render();
+  try{ await Promise.all(rows.map((r,i)=>upd(r.id,{poradi:i}))); }
+  catch(e){ toast('Chyba pořadí',true); }
+}
+
+// Copy from prev month
+async function copyPrev() {
+  const p=new Date(cur.getFullYear(),cur.getMonth()-1,1);
+  const pk=`${p.getFullYear()}-${String(p.getMonth()+1).padStart(2,'0')}`;
+  try {
+    const pr=await get(pk);
+    if(!pr.length){toast('Předchozí měsíc je prázdný',true);return;}
+    for(let i=0;i<pr.length;i++){
+      const r=pr[i];
+      await ins({mesic:mk(),nazev:r.nazev,cl_castka:r.cl_castka,real_castka:null,kategorie:r.kategorie||null,poradi:i});
+    }
+    rows=await get(mk()); render(); toast(`Zkopírováno ${pr.length} položek`);
+  }catch(e){toast('Chyba kopírování',true);}
+}
+
+function chMonth(d){cur=new Date(cur.getFullYear(),cur.getMonth()+d,1);load();}
 
 load();
 </script>
