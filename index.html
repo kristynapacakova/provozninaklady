@@ -50,8 +50,8 @@ main { max-width: 1200px; margin: 0 auto; padding: 28px 32px; }
 /* Table */
 .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 1px 6px rgba(45,53,97,.07); }
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-col.col-drag { width: 28px; } col.col-kat { width: 0; } col.col-name { width: 38%; }
-col.col-cl { width: 17%; } col.col-real { width: 17%; } col.col-diff { width: 14%; } col.col-flag { width: 28px; } col.col-act { width: 28px; }
+col.col-drag { width: 28px; } col.col-kat { width: 0; max-width: 0; overflow: hidden; padding: 0; } col.col-name { width: 42%; }
+col.col-cl { width: 16%; } col.col-real { width: 16%; } col.col-diff { width: 13%; } col.col-flag { width: 28px; } col.col-act { width: 28px; }
 thead th { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); padding: 11px 12px 9px; text-align: left; background: #f7f8fc; border-bottom: 1px solid var(--border); white-space: nowrap; }
 thead th.r { text-align: right; }
 thead th.col-kat-th { display: none; }
@@ -61,7 +61,7 @@ tbody tr:hover { background: #fafaf8; }
 tbody tr.dragging { opacity: .35; background: var(--accent-light); }
 tbody tr.drag-over-top { box-shadow: inset 0 2px 0 var(--accent); }
 tbody td { padding: 0; vertical-align: middle; }
-tbody td.td-kat { display: none; }
+tbody td.td-kat { display: none !important; padding: 0 !important; width: 0 !important; max-width: 0 !important; overflow: hidden !important; border: none !important; }
 tr.kat-separator { background: none !important; }
 tr.kat-separator td { padding: 14px 12px 5px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); background: none; border-bottom: none; }
 tr.kat-separator:not(:first-child) td { border-top: 1px solid var(--border); padding-top: 16px; }
@@ -303,7 +303,7 @@ function render() {
     return separator+`<tr draggable="true" data-id="${r.id}" data-idx="${origIdx}" class="${flagged?'flagged-row':''}" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)" ondragend="dragEnd(event)">
       <td><div class="drag-handle" title="Přetáhnout pro přeřazení"><svg width="10" height="16" viewBox="0 0 10 16" fill="none"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div></td>
       <td class="td-kat"><div class="kat-wrap"><span class="kat-dot" id="dot-${r.id}" style="background:${katColor}"></span><select class="kat-select" data-id="${r.id}" onchange="saveKat(this)"><option value="">—</option>${KATEGORIE.map(k=>`<option value="${escHtml(k)}"${k===kat?' selected':''}>${escHtml(k)}</option>`).join('')}</select></div></td>
-      <td><div style="display:flex;align-items:center;"><span style="width:6px;height:6px;border-radius:50%;background:${katColor};flex-shrink:0;margin-left:12px;margin-right:8px;"></span><input class="cell-input" style="padding-left:0;flex:1;min-width:0;" type="text" value="${escHtml(r.nazev)}" placeholder="Název položky…" data-field="nazev" data-id="${r.id}" oninput="schedSave(this)" ${enter}></div></td>
+      <td><div style="display:flex;align-items:center;width:100%;"><span style="width:7px;height:7px;border-radius:50%;background:${katColor};flex-shrink:0;margin:0 8px 0 12px;display:inline-block;"></span><input class="cell-input" style="padding-left:0;width:calc(100% - 27px);" type="text" value="${escHtml(r.nazev)}" placeholder="Název položky…" data-field="nazev" data-id="${r.id}" oninput="schedSave(this)" ${enter}></div></td>
       <td><input class="cell-input mono" type="text" value="${clDisp}" data-raw="${clRaw}" placeholder="0,00" data-field="cl_castka" data-id="${r.id}" oninput="schedSave(this)" onfocus="switchToRaw(this)" onblur="switchToFormatted(this)" ${enter}></td>
       <td><input class="cell-input mono" type="text" value="${reDisp}" data-raw="${reRaw}" placeholder="0,00" data-field="real_castka" data-id="${r.id}" oninput="schedSave(this)" onfocus="switchToRaw(this)" onblur="switchToFormatted(this)" ${enter}></td>
       <td><span class="diff-badge ${dc}" id="diff-${r.id}">${dt}</span></td>
